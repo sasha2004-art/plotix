@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .key-group { display: flex; align-items: center; gap: 10px; }
+        .key-group input { flex-grow: 1; }
+        .key-group button { width: 120px; font-size: 14px; padding: 10px; }
+        .status-message { font-size: 14px; height: 20px; }
+        .status-ok { color: #28a745; }
+        .status-error { color: #dc3545; }
+        .collapsible-container {
+            margin-bottom: 20px;
+            border: 1px solid var(--bg-task-card-footer);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .collapsible-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-sidebar);
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+        .collapsible-content {
+            padding: 20px;
+            border-top: 1px solid var(--bg-task-card-footer);
+            display: none;
+        }
+        .upload-area { display: flex; align-items: center; gap: 15px; }
+        #custom-upload-btn {
+            width: 50px;
+            height: 50px;
+            font-size: 28px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            padding: 0;
+            line-height: 50px;
+        }
+        #file-list-display {
+            background-color: var(--bg-sidebar);
+            border-radius: 4px;
+            padding: 10px 15px;
+            flex-grow: 1;
+            font-size: 14px;
+            color: var(--text-muted);
+            min-height: 30px;
+        }
+        .action-buttons { margin-top: 15px; display: none; gap: 15px; }
+        .action-buttons button { width: auto; flex-grow: 1; }
+        #operation-status {
+            background-color: var(--bg-sidebar);
+            border: 1px solid var(--bg-task-card-footer);
+            padding: 15px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin-top: 15px;
+            display: none;
+        }
+        .search-bar { margin-bottom: 15px; }
+        .search-bar input { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid var(--bg-task-card-footer); background-color: var(--bg-sidebar); color: var(--text-primary); }
+        .tabs { display: flex; border-bottom: 1px solid var(--bg-task-card-footer); margin-bottom: 15px; }
+        .tab-link { background: none; border: none; padding: 10px 15px; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; }
+        .tab-link.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
+        .model-card { background-color: var(--bg-sidebar); border-radius: 4px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px;}
+        .model-info { flex-grow: 1; }
+        .model-info h4 { margin: 0 0 5px; }
+        .model-info p { margin: 0; font-size: 14px; color: var(--text-muted); }
+        .model-actions { width: 250px; flex-shrink: 0; text-align: right; }
+        .model-actions .download-btn { font-size: 14px; padding: 8px 12px; width: 100px; }
+        .tooltip { position: relative; display: inline-block; }
+        .tooltip .tooltiptext { visibility: hidden; width: 220px; background-color: #555; color: #fff; text-align: center; border-radius: 6px; padding: 5px 0; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+
+        /* Стили для прогресс-бара */
+        .progress-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .progress-bar-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .progress-bar-wrapper progress {
+            flex-grow: 1;
+            height: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .progress-bar-wrapper progress::-webkit-progress-bar {
+            background-color: var(--bg-task-card-footer);
+            border-radius: 4px;
+        }
+        .progress-bar-wrapper progress::-webkit-progress-value {
+            background-color: var(--accent-primary);
+            border-radius: 4px;
+            transition: width 0.1s linear;
+        }
+        .progress-bar-wrapper .cancel-btn {
+            background: none;
+            border: 1px solid var(--text-placeholder);
+            color: var(--text-placeholder);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            line-height: 22px;
+            padding: 0;
+            font-size: 18px;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .progress-bar-wrapper .cancel-btn:hover {
+            background-color: var(--accent-failed);
+            color: #fff;
+            border-color: var(--accent-failed);
+        }
+        .progress-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 0 5px;
+        }
+        .progress-text { font-family: var(--font-mono); }
+        .progress-speed { font-family: var(--font-mono); }
+        
+        /* --- НОВЫЕ СТИЛИ ДЛЯ МЕНЕДЖЕРА МОДЕЛЕЙ --- */
+        .installed-models-toolbar { display: flex; justify-content: space-between; align-items:center; gap: 10px; margin-bottom: 15px; }
+        .installed-models-toolbar button { width: auto; font-size: 14px; padding: 8px 12px; }
+        .installed-models-toolbar button:disabled { background-color: var(--text-muted); cursor: not-allowed; opacity: 0.7; }
+        #installed-models-list { max-height: 300px; overflow-y: auto; background-color: var(--bg-sidebar); border: 1px solid var(--bg-task-card-footer); border-radius: 4px; padding: 10px; margin-bottom: 10px; }
+        .model-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 4px; }
+        .model-item:nth-child(even) { background-color: var(--bg-sidebar-container); }
+        .model-item label { flex-grow: 1; cursor: pointer; color: var(--text-primary); }
+        .model-item .model-size { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); }
+        .select-all-container { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+        .select-all-container label { cursor: pointer; }
+        #delete-status { margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="settings-wrapper">
+        <div class="container">
+            <a href="/" class="home-link" title="Назад к генератору">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/></svg>
+            </a>
+            <h1>Настройка</h1>
+            <p>Управляйте своими API-ключами и локальными моделями.</p>
+    
+            <div class="collapsible-container">
+                <div class="collapsible-header" data-target="api-keys-content">
+                    <div class="result-box-title">API Ключи</div>
+                    <button class="icon-btn toggle-btn"></button>
+                </div>
+                <div class="collapsible-content" id="api-keys-content">
+                    <div class="form-group">
+                        <label for="groq-api-key-input">Groq API Ключ:</label>
+                        <div class="key-group">
+                            <input type="password" id="groq-api-key-input" placeholder="gsk_...">
+                            <button class="check-key-btn" data-provider="groq">Проверить</button>
+                        </div>
+                        <span class="status-message" id="groq-status"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="openai-api-key-input">OpenAI API Ключ:</label>
+                        <div class="key-group">
+                            <input type="password" id="openai-api-key-input" placeholder="sk_...">
+                            <button class="check-key-btn" data-provider="openai">Проверить</button>
+                        </div>
+                        <span class="status-message" id="openai-status"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="gemini-api-key-input">Google Gemini API Ключ:</label>
+                        <div class="key-group">
+                            <input type="password" id="gemini-api-key-input" placeholder="AIzaSy...">
+                            <button class="check-key-btn" data-provider="gemini">Проверить</button>
+                        </div>
+                        <span class="status-message" id="gemini-status"></span>
+                    </div>
+                    <button id="save-keys-btn">Сохранить Ключи</button>
+                </div>
+            </div>
+            
+            {% if use_local_llm %}
+            <div class="collapsible-container">
+                <div class="collapsible-header" data-target="add-llm-content">
+                    <div class="result-box-title">Добавить локальные модели</div>
+                    <button class="icon-btn toggle-btn"></button>
+                </div>
+                <div class="collapsible-content" id="add-llm-content">
+                    <p>Добавьте файлы моделей <code>.gguf</code> в проект, выбрав их на своем компьютере.</p>
+                    <div class="upload-area">
+                        <button id="custom-upload-btn" title="Выбрать файлы моделей">+</button>
+                        <div id="file-list-display">Файлы не выбраны</div>
+                    </div>
+                    <div class="action-buttons" id="model-action-buttons">
+                        <button id="copy-btn">Копировать в проект</button>
+                        <button id="move-btn">Переместить в проект</button>
+                    </div>
+                    <div id="operation-status"></div>
+                </div>
+            </div>
+
+            <div class="collapsible-container">
+                <div class="collapsible-header" data-target="installed-models-content">
+                    <div class="result-box-title">Управление установленными моделями</div>
+                    <button class="icon-btn toggle-btn"></button>
+                </div>
+                <div class="collapsible-content" id="installed-models-content">
+                    <div class="installed-models-toolbar">
+                        <button id="delete-selected-btn" disabled>Удалить выбранные</button>
+                        <button id="refresh-models-btn">Обновить список</button>
+                    </div>
+                    <div id="installed-models-list">
+                        <!-- Модели будут загружены сюда -->
+                    </div>
+                    <div class="select-all-container">
+                         <input type="checkbox" id="select-all-checkbox" disabled>
+                         <label for="select-all-checkbox">Выбрать все</label>
+                    </div>
+                    <div id="delete-status" class="status-message"></div>
+                </div>
+            </div>
+    
+            <div class="collapsible-container">
+                <div class="collapsible-header" data-target="recommended-models-content">
+                    <div class="result-box-title">Скачать рекомендуемые модели GGUF</div>
+                    <button class="icon-btn toggle-btn"></button>
+                </div>
+                <div class="collapsible-content" id="recommended-models-content">
+                    <div class="search-bar">
+                        <input type="text" id="model-search-input" placeholder="Поиск моделей...">
+                    </div>
+                    <div class="tabs">
+                        <button class="tab-link active" data-tab="low">Для слабых ПК</button>
+                        <button class="tab-link" data-tab="medium">Для средних ПК</button>
+                        <button class="tab-link" data-tab="high">Для мощных ПК</button>
+                    </div>
+                    <div id="model-list-container">
+                        <!-- Модели будут загружены сюда -->
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="settings-container">
+                <div class="theme-selector">
+                    <label for="theme-select">Тема:</label>
+                    <select id="theme-select">
+                        <option value="system">Как в системе</option>
+                        <option value="light">Светлая</option>
+                        <option value="dark">Темная</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    // --- Глобальные функции для управления UI из Python ---
+
+    // Вызывается для СБРОСА UI в начальное состояние после завершения
+    function dispatchDownloadEvent(repoId, filename, status, message) {
+        const modelCard = document.querySelector(`.model-card[data-repo-id="${repoId}"][data-filename="${filename}"]`);
+        if (!modelCard) return;
+
+        const actionsContainer = modelCard.querySelector('.model-actions');
+        actionsContainer.innerHTML = `
+            <button class="download-btn" data-repo-id="${repoId}" data-filename="${filename}">Скачать</button>
+        `;
+        
+        if (status !== 'cancelled') {
+            alert(message);
+        }
+    }
+    window.dispatchDownloadEvent = dispatchDownloadEvent;
+
+    // Вызывается для ОБНОВЛЕНИЯ прогресс-бара во время скачивания
+    function updateDownloadProgress(repoId, filename, downloaded, total, speed, percentage) {
+        const modelCard = document.querySelector(`.model-card[data-repo-id="${repoId}"][data-filename="${filename}"]`);
+        if (!modelCard) return;
+
+        const actionsContainer = modelCard.querySelector('.model-actions');
+        let progressContainer = actionsContainer.querySelector('.progress-container');
+
+        if (!progressContainer) {
+            // Создаем прогресс-бар, если его еще нет
+            actionsContainer.innerHTML = `
+                <div class="progress-container">
+                    <div class="progress-bar-wrapper">
+                        <progress value="0" max="100"></progress>
+                        <button class="cancel-btn" data-repo-id="${repoId}" data-filename="${filename}">×</button>
+                    </div>
+                    <div class="progress-details">
+                        <span class="progress-text"></span>
+                        <span class="progress-speed"></span>
+                    </div>
+                </div>
+            `;
+            progressContainer = actionsContainer.querySelector('.progress-container');
+        }
+
+        // Обновляем значения
+        progressContainer.querySelector('progress').value = percentage;
+        progressContainer.querySelector('.progress-text').textContent = `${downloaded} / ${total} (${percentage.toFixed(1)}%)`;
+        progressContainer.querySelector('.progress-speed').textContent = speed;
+    }
+    window.updateDownloadProgress = updateDownloadProgress;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Логика для сворачиваемых блоков ---
+        const upArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>`;
+        const downArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>`;
+        document.querySelectorAll('.collapsible-header').forEach(header => {
+            const content = document.getElementById(header.dataset.target);
+            const toggleBtn = header.querySelector('.toggle-btn');
+            
+            if (!content || !toggleBtn) return;
+            const isVisible = content.style.display === 'block';
+            toggleBtn.innerHTML = isVisible ? upArrow : downArrow;
+            header.addEventListener('click', () => {
+                const isNowVisible = content.style.display === 'block';
+                content.style.display = isNowVisible ? 'none' : 'block';
+                toggleBtn.innerHTML = isNowVisible ? downArrow : upArrow;
+            });
+        });
+        const firstContainer = document.querySelector('.collapsible-content');
+        if (firstContainer) {
+            firstContainer.style.display = 'block';
+            const firstToggleBtn = firstContainer.parentElement.querySelector('.toggle-btn');
+            if (firstToggleBtn) firstToggleBtn.innerHTML = upArrow;
+        }
+
+        // --- Остальная логика ---
+        const themeSelect = document.getElementById('theme-select');
+        function applyTheme(theme) {
+            if (theme === 'system') {
+                const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', systemTheme);
+            } else { document.documentElement.setAttribute('data-theme', theme); }
+            localStorage.setItem('theme', theme);
+        }
+        if (themeSelect) {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+            themeSelect.value = savedTheme;
+            applyTheme(savedTheme);
+            themeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
+        } else {
+            const savedTheme = localStorage.getItem('theme') || 'system';
+            applyTheme(savedTheme);
+        }
+        
+        async function checkKey(provider) {
+            const input = document.getElementById(`${provider}-api-key-input`);
+            const statusEl = document.getElementById(`${provider}-status`);
+            if (!input || !statusEl) return;
+            const apiKey = input.value.trim();
+            statusEl.textContent = 'Проверка...';
+            statusEl.className = 'status-message';
+            if (!apiKey) {
+                statusEl.textContent = 'Ключ не введен.';
+                statusEl.classList.add('status-error');
+                return;
+            }
+            try {
+                const response = await fetch('/validate_api_key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_provider: provider, api_key: apiKey }),
+                });
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    statusEl.textContent = 'Ключ действителен!';
+                    statusEl.classList.add('status-ok');
+                } else {
+                    statusEl.textContent = `Ошибка: ${data.message || 'Неизвестная ошибка'}`;
+                    statusEl.classList.add('status-error');
+                }
+            } catch (error) {
+                statusEl.textContent = 'Сетевая ошибка.';
+                statusEl.classList.add('status-error');
+            }
+        }
+        document.getElementById('save-keys-btn').addEventListener('click', () => {
+            const groqApiKey = document.getElementById('groq-api-key-input').value;
+            const openaiApiKey = document.getElementById('openai-api-key-input').value;
+            const geminiApiKey = document.getElementById('gemini-api-key-input').value;
+            if (groqApiKey) localStorage.setItem('groq_api_key', groqApiKey);
+            if (openaiApiKey) localStorage.setItem('openai_api_key', openaiApiKey);
+            if (geminiApiKey) localStorage.setItem('gemini_api_key', geminiApiKey);
+            alert('Ключи сохранены в локальном хранилище!');
+        });
+        document.getElementById('groq-api-key-input').value = localStorage.getItem('groq_api_key') || '';
+        document.getElementById('openai-api-key-input').value = localStorage.getItem('openai_api_key') || '';
+        document.getElementById('gemini-api-key-input').value = localStorage.getItem('gemini_api_key') || '';
+        document.querySelectorAll('.check-key-btn').forEach(button => {
+            button.addEventListener('click', () => checkKey(button.dataset.provider));
+        });
+
+        {% if use_local_llm %}
+        // --- Секция добавления моделей ---
+        const customBtn = document.getElementById('custom-upload-btn');
+        const fileListDisplay = document.getElementById('file-list-display');
+        const actionButtonsContainer = document.getElementById('model-action-buttons');
+        const copyBtn = document.getElementById('copy-btn');
+        const moveBtn = document.getElementById('move-btn');
+        const operationStatus = document.getElementById('operation-status');
+        let selectedFilePaths = [];
+        customBtn.addEventListener('click', async () => {
+            try {
+                if (!window.pywebview || !window.pywebview.api) { alert("Функция доступна только в десктопном приложении."); return; }
+                const result = await window.pywebview.api.open_file_dialog();
+                selectedFilePaths = result || [];
+                operationStatus.style.display = 'none';
+                if (selectedFilePaths.length > 0) {
+                    const fileNames = selectedFilePaths.map(path => path.split(/[\\/]/).pop());
+                    fileListDisplay.textContent = `Выбрано: ${fileNames.join(', ')}`;
+                    actionButtonsContainer.style.display = 'flex';
+                } else {
+                    fileListDisplay.textContent = 'Файлы не выбраны';
+                    actionButtonsContainer.style.display = 'none';
+                }
+            } catch (e) {
+                console.error("Ошибка при вызове диалога выбора файла:", e);
+                fileListDisplay.textContent = "Ошибка при открытии диалога.";
+            }
+        });
+        async function handleFileAction(action) {
+            if (selectedFilePaths.length === 0) return;
+            copyBtn.disabled = true;
+            moveBtn.disabled = true;
+            operationStatus.textContent = "Выполняется операция...";
+            operationStatus.className = "";
+            operationStatus.style.display = 'block';
+            try {
+                const result = await window.pywebview.api.manage_files(action, selectedFilePaths);
+                operationStatus.textContent = result.message;
+                operationStatus.classList.add(result.status === 'ok' ? 'status-ok' : 'status-error');
+                if (result.status === 'ok') {
+                    // Обновляем список установленных моделей после успешного добавления
+                    if (window.loadInstalledModels) window.loadInstalledModels();
+                }
+            } catch (e) {
+                console.error("Ошибка при выполнении файловой операции:", e);
+                operationStatus.textContent = "Критическая ошибка. См. консоль.";
+                operationStatus.classList.add('status-error');
+            } finally {
+                copyBtn.disabled = false;
+                moveBtn.disabled = false;
+                selectedFilePaths = [];
+                fileListDisplay.textContent = 'Файлы не выбраны';
+                actionButtonsContainer.style.display = 'none';
+            }
+        }
+        copyBtn.addEventListener('click', () => handleFileAction('copy'));
+        moveBtn.addEventListener('click', () => handleFileAction('move'));
+
+        // --- Секция управления установленными моделями ---
+        const deleteBtn = document.getElementById('delete-selected-btn');
+        const refreshBtn = document.getElementById('refresh-models-btn');
+        const modelsListDiv = document.getElementById('installed-models-list');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        const deleteStatus = document.getElementById('delete-status');
+
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        async function loadInstalledModels() {
+            modelsListDiv.innerHTML = '<p>Загрузка...</p>';
+            try {
+                const response = await fetch('/api/local_models');
+                if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
+                const data = await response.json();
+                
+                modelsListDiv.innerHTML = ''; // Clear
+                
+                if (!data.models || data.models.length === 0) {
+                    modelsListDiv.innerHTML = '<p>Локальные модели не найдены.</p>';
+                    selectAllCheckbox.disabled = true;
+                    return;
+                }
+
+                selectAllCheckbox.disabled = false;
+                data.models.forEach(model => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'model-item';
+                    const uniqueId = `model-checkbox-${model.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                    itemDiv.innerHTML = `
+                        <input type="checkbox" class="model-checkbox" data-filename="${model.name}" id="${uniqueId}">
+                        <label for="${uniqueId}">${model.name}</label>
+                        <span class="model-size">${formatBytes(model.size)}</span>
+                    `;
+                    modelsListDiv.appendChild(itemDiv);
+                });
+            } catch (error) {
+                console.error('Failed to load local models:', error);
+                modelsListDiv.innerHTML = `<p class="status-error">Ошибка загрузки моделей: ${error.message}</p>`;
+            } finally {
+                updateDeleteButtonState();
+                selectAllCheckbox.checked = false;
+            }
+        }
+        window.loadInstalledModels = loadInstalledModels; // expose to be callable from other scopes
+
+        function updateDeleteButtonState() {
+            const checkedBoxes = modelsListDiv.querySelectorAll('.model-checkbox:checked');
+            deleteBtn.disabled = checkedBoxes.length === 0;
+        }
+
+        modelsListDiv.addEventListener('change', (e) => {
+            if (e.target.classList.contains('model-checkbox')) {
+                updateDeleteButtonState();
+                const allCheckboxes = modelsListDiv.querySelectorAll('.model-checkbox');
+                const checkedCheckboxes = modelsListDiv.querySelectorAll('.model-checkbox:checked');
+                selectAllCheckbox.checked = allCheckboxes.length > 0 && allCheckboxes.length === checkedCheckboxes.length;
+            }
+        });
+
+        selectAllCheckbox.addEventListener('change', () => {
+            modelsListDiv.querySelectorAll('.model-checkbox').forEach(cb => {
+                cb.checked = selectAllCheckbox.checked;
+            });
+            updateDeleteButtonState();
+        });
+
+        refreshBtn.addEventListener('click', loadInstalledModels);
+
+        deleteBtn.addEventListener('click', async () => {
+            const checkedBoxes = modelsListDiv.querySelectorAll('.model-checkbox:checked');
+            const filenamesToDelete = Array.from(checkedBoxes).map(cb => cb.dataset.filename);
+            
+            if (filenamesToDelete.length === 0) return;
+
+            if (!confirm(`Вы уверены, что хотите удалить ${filenamesToDelete.length} файл(ов)? Это действие необратимо.`)) {
+                return;
+            }
+
+            deleteStatus.textContent = 'Удаление...';
+            deleteStatus.className = 'status-message';
+            deleteBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/local_models/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filenames: filenamesToDelete })
+                });
+                const result = await response.json();
+                
+                deleteStatus.textContent = result.message;
+                deleteStatus.classList.add(result.status === 'ok' ? 'status-ok' : 'status-error');
+            } catch (error) {
+                console.error('Deletion error:', error);
+                deleteStatus.textContent = 'Ошибка сети при удалении.';
+                deleteStatus.classList.add('status-error');
+            } finally {
+                await loadInstalledModels();
+            }
+        });
+
+        // --- Секция скачивания моделей ---
+        const modelSearchInput = document.getElementById('model-search-input');
+        const tabLinks = document.querySelectorAll('.tab-link');
+        const modelListContainer = document.getElementById('model-list-container');
+        let allModels = {};
+        let currentTab = 'low';
+
+        async function fetchRecommendedModels() {
+            try {
+                const response = await fetch('/api/recommended_models');
+                allModels = await response.json();
+                renderModels();
+            } catch (error) {
+                console.error('Ошибка при загрузке рекомендуемых моделей:', error);
+                modelListContainer.innerHTML = '<p>Не удалось загрузить модели. Попробуйте позже.</p>';
+            }
+        }
+        function renderModels() {
+            const searchTerm = modelSearchInput.value.toLowerCase();
+            const models = allModels[currentTab] || [];
+            const filteredModels = models.filter(model =>
+                model.repo_id.toLowerCase().includes(searchTerm) ||
+                model.filename.toLowerCase().includes(searchTerm) ||
+                model.description.toLowerCase().includes(searchTerm)
+            );
+            modelListContainer.innerHTML = '';
+            if (filteredModels.length === 0) {
+                modelListContainer.innerHTML = '<p>Модели не найдены.</p>';
+                return;
+            }
+            filteredModels.forEach(model => {
+                const card = document.createElement('div');
+                card.className = 'model-card';
+                card.dataset.repoId = model.repo_id;
+                card.dataset.filename = model.filename;
+                card.innerHTML = `
+                    <div class="model-info">
+                        <h4>${model.filename}</h4>
+                        <p>${model.description}</p>
+                        <div class="tooltip">
+                            <p><strong>Требования:</strong> ${model.requirements}</p>
+                            <span class="tooltiptext">Репозиторий: ${model.repo_id}</span>
+                        </div>
+                    </div>
+                    <div class="model-actions">
+                        <button class="download-btn" data-repo-id="${model.repo_id}" data-filename="${model.filename}">Скачать</button>
+                    </div>
+                `;
+                modelListContainer.appendChild(card);
+            });
+        }
+        tabLinks.forEach(tab => {
+            tab.addEventListener('click', () => {
+                currentTab = tab.dataset.tab;
+                tabLinks.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                renderModels();
+            });
+        });
+        modelSearchInput.addEventListener('input', renderModels);
+
+        modelListContainer.addEventListener('click', async (e) => {
+            const target = e.target;
+            if (!window.pywebview || !window.pywebview.api) {
+                 if (target.classList.contains('download-btn') || target.classList.contains('cancel-btn')) {
+                    alert("Функция доступна только в десктопном приложении.");
+                 }
+                 return;
+            }
+            if (target.classList.contains('download-btn')) {
+                const button = target;
+                const { repoId, filename } = button.dataset;
+                button.parentElement.innerHTML = `<p style="font-size: 14px; text-align: center;">Запуск...</p>`;
+                const result = await window.pywebview.api.download_model(repoId, filename);
+                if (result && result.status === 'error') {
+                    dispatchDownloadEvent(repoId, filename, 'error', result.message);
+                }
+            } else if (target.classList.contains('cancel-btn')) {
+                const button = target;
+                const { repoId, filename } = button.dataset;
+                button.textContent = '...';
+                button.disabled = true;
+                await window.pywebview.api.cancel_download(repoId, filename);
+            }
+        });
+        
+        // --- Initial loads for local models sections ---
+        loadInstalledModels();
+        if (document.getElementById('recommended-models-content')) {
+            fetchRecommendedModels();
+        }
+        {% endif %}
+    });
+    </script>
+</body>
+</html>

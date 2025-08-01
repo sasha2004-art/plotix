@@ -1,0 +1,503 @@
+:root {
+    --font-primary: 'Google Sans', 'Roboto', sans-serif;
+    --font-mono: 'Google Sans Mono', 'Courier New', monospace;
+
+    --bg-main: #ffffff;
+    --bg-sidebar: #f0f0f0;
+    --bg-sidebar-container: #e8e8e8;
+    --bg-top-nav: #f5f5f5;
+    --bg-task-card-footer: #f0f0f0;
+    --text-primary: #000000;
+    --text-sidebar: #333333;
+    --text-muted: #555555;
+    --text-placeholder: #888888;
+    --accent-primary: #005cbb;
+    --accent-attention: #d93025;
+    --accent-feedback: #f9ab00;
+    --accent-failed: #d93025;
+    --snackbar-button: #1a73e8;
+}
+
+[data-theme="dark"] {
+    --bg-main: #28252b;
+    --bg-sidebar: #141316;
+    --bg-sidebar-container: #18161a;
+    --bg-top-nav: #201d22;
+    --bg-task-card-footer: #2f2c32;
+    --text-primary: #ffffff;
+    --text-sidebar: #e6e1ff;
+    --text-muted: #bfb8dd;
+    --text-placeholder: #7a7384;
+    --accent-primary: #715cd7;
+    --accent-attention: #715cd7;
+    --accent-feedback: #ffb64a;
+    --accent-failed: #ff6767;
+    --snackbar-button: #abc7ff;
+}
+
+/* --- Стили для скроллбаров --- */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-sidebar);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-primary);
+}
+
+html, body {
+    overflow: hidden; /* Предотвращаем двойные скроллбары */
+    height: 100%;
+}
+
+body {
+    font-family: var(--font-primary);
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin: 0;
+    /* padding: 20px; */
+}
+.container {
+    max-width: 800px;
+    margin: 20px auto;
+    background-color: var(--bg-sidebar-container);
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    position: relative;
+}
+h1, h2 {
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--bg-task-card-footer);
+    padding-bottom: 10px;
+}
+.form-group {
+    margin-bottom: 20px;
+}
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: var(--text-muted);
+}
+input[type="password"], textarea {
+    width: 100%;
+    padding: 10px;
+    background-color: var(--bg-sidebar);
+    border: 1px solid var(--bg-task-card-footer);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+textarea::placeholder {
+    color: var(--text-placeholder);
+}
+
+button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background-color: var(--accent-primary);
+    color: var(--text-sidebar);
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+button:hover {
+    opacity: 0.8;
+}
+button:disabled {
+    background-color: var(--text-muted);
+    cursor: not-allowed;
+}
+.result-container {
+    margin-top: 30px;
+    border: 1px solid var(--bg-task-card-footer);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.result-box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--bg-sidebar);
+    padding: 8px 15px;
+    border-bottom: 1px solid var(--bg-task-card-footer);
+}
+
+.result-box-title {
+    font-weight: bold;
+    font-size: 16px;
+    color: var(--text-muted);
+}
+
+.result-box-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-placeholder);
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, color 0.2s;
+    width: auto; /* Allow the button to size to its content */
+    margin-left: auto; /* Push the button to the right */
+}
+
+.icon-btn:hover {
+    background-color: var(--bg-task-card-footer);
+    color: var(--text-primary);
+}
+pre {
+    background-color: var(--bg-sidebar);
+    padding: 15px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: var(--font-mono);
+    max-height: 500px;
+    overflow-y: auto;
+    color: var(--text-primary);
+    margin: 0;
+}
+.form-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-end;
+}
+
+.provider-group {
+    flex-grow: 1;
+}
+
+.model-group {
+    flex-grow: 1;
+    max-width: 300px; /* Or adjust as needed */
+}
+
+#model-selector {
+    width: 100%;
+    padding: 10px;
+    background-color: var(--bg-sidebar);
+    border: 1px solid var(--bg-task-card-footer);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.provider-selector {
+    display: flex;
+    gap: 20px;
+    background-color: var(--bg-sidebar);
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: 1px solid var(--bg-task-card-footer);
+}
+
+.provider-selector label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.api-key-management {
+    margin-bottom: 20px;
+}
+
+.api-key-management a {
+    color: var(--snackbar-button);
+    text-decoration: none;
+}
+.api-key-management a:hover {
+    text-decoration: underline;
+}
+.main-layout {
+    display: flex;
+    height: 100vh;
+}
+.sidebar {
+    width: 27.5rem;
+    max-width: 27.5rem;
+    min-width: 5rem;
+    background-color: var(--bg-sidebar-container);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--bg-task-card-footer);
+    transition: all 0.3s ease-in-out;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.sidebar.collapsed {
+    width: 6rem;
+}
+
+.sidebar.collapsed .logo-container h1,
+.sidebar.collapsed .chat-header h2,
+.sidebar.collapsed #new-chat-btn,
+.sidebar.collapsed .sidebar-footer,
+.sidebar.collapsed #settings-btn {
+    display: none;
+}
+.logo-container {
+    display: flex;
+    align-items: center;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--bg-task-card-footer);
+}
+
+.logo-container h1 {
+    color: var(--text-primary);
+    margin: 0 0 0 10px;
+    font-size: 24px;
+    border: none;
+    margin-right: auto;
+}
+
+.logo-svg {
+    width: 40px;
+    height: 40px;
+    fill: var(--accent-primary);
+}
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#new-chat-btn {
+    background-color: var(--accent-primary);
+    color: var(--text-sidebar);
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.chat-list {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+.chat-item {
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-grow: 1;
+    padding-right: 10px;
+    color: var(--text-sidebar);
+}
+
+.chat-item:hover, .chat-item.active {
+    background-color: var(--bg-sidebar);
+}
+
+.chat-item .chat-actions {
+    display: none;
+}
+
+.chat-item:hover .chat-actions {
+    display: flex;
+}
+
+.chat-item .edit-btn, .chat-item .delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 5px;
+}
+
+.chat-item:hover .edit-btn, .chat-item:hover .delete-btn {
+    display: inline;
+}
+
+.edit-btn {
+    color: var(--snackbar-button);
+}
+
+.delete-btn {
+    color: var(--accent-failed);
+}
+
+/* --- Стили для страницы настроек --- */
+.settings-wrapper {
+    height: 100vh; /* Занимает 100% высоты видимой области */
+    overflow-y: auto; /* Разрешает вертикальную прокрутку ТОЛЬКО для этого блока */
+}
+
+/* Эта правка гарантирует, что .container будет красиво выглядеть внутри прокручиваемого блока */
+.settings-wrapper .container {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+.sidebar-footer {
+    margin-top: auto;
+}
+.settings-btn {
+    background: none;
+    border: 1px solid var(--text-placeholder);
+    color: var(--text-placeholder);
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, color 0.2s;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+}
+
+.settings-btn:hover {
+    background-color: var(--bg-task-card-footer);
+    color: var(--text-primary);
+}
+.chat-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: var(--bg-main);
+}
+.content-wrapper {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+/* --- ИЗМЕНЕНИЕ: Стили для кастомного заголовка окна --- */
+.title-bar {
+    -webkit-app-region: drag; /* Делаем ВСЮ панель перетаскиваемой */
+    display: flex;
+    justify-content: flex-end; /* Выравниваем дочерние элементы (кнопки) по правому краю */
+    height: 32px;
+    background-color: var(--bg-main);
+    align-items: center;
+    padding-right: 8px; /* Отступ для кнопок */
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--bg-task-card-footer);
+}
+.window-controls {
+    -webkit-app-region: no-drag; /* А блок с кнопками делаем ИСКЛЮЧЕНИЕМ, чтобы они были кликабельны */
+    display: flex;
+    gap: 8px;
+}
+.window-control-btn {
+    /* С кнопок можно убрать no-drag, так как он есть на родителе, но лучше оставить для надежности */
+    -webkit-app-region: no-drag;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    width: 32px;
+    height: 24px;
+    font-size: 16px;
+    line-height: 24px;
+    padding: 0;
+    text-align: center;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+.window-control-btn:hover {
+    background-color: var(--bg-task-card-footer);
+    color: var(--text-primary);
+}
+.close-btn:hover {
+    background-color: var(--accent-failed);
+    color: #fff;
+}
+
+
+#theme-select {
+    width: 100%;
+    padding: 5px;
+    background-color: var(--bg-sidebar);
+    border: 1px solid var(--bg-task-card-footer);
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+
+.settings-container {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--bg-task-card-footer);
+}
+
+.theme-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.home-link {
+    position: absolute;
+    top: 25px;
+    right: 25px;
+    color: var(--text-muted);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    border-radius: 50%;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.home-link:hover {
+    background-color: var(--bg-task-card-footer);
+    color: var(--text-primary);
+}
+
+.home-link svg {
+    width: 28px;
+    height: 28px;
+    fill: currentColor;
+}
