@@ -11,6 +11,55 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    <!-- ИЗМЕНЕНИЕ: Глобальный обработчик событий, который должен быть на каждой странице -->
+    <script id="global-event-handler">
+        // --- Глобальная система управления состоянием загрузок ---
+        // Эти функции должны быть доступны глобально, чтобы Python мог их вызвать.
+
+        // 1. Управление состоянием в localStorage
+        function getActiveDownloads() {
+            return JSON.parse(localStorage.getItem('activeDownloads')) || {};
+        }
+
+        function setActiveDownloads(downloads) {
+            localStorage.setItem('activeDownloads', JSON.stringify(downloads));
+        }
+
+        // 2. Функции, вызываемые из Python
+        window.startDownload = (repoId, filename) => {
+            const downloads = getActiveDownloads();
+            const taskId = `${repoId}/${filename}`;
+            downloads[taskId] = {
+                repo_id: repoId,
+                filename: filename,
+                percentage: 0,
+                downloaded_str: '0 B',
+                total_str: 'N/A',
+                speed_str: 'N/A'
+            };
+            setActiveDownloads(downloads);
+            // Отправляем кастомное событие, чтобы UI мог на него отреагировать
+            window.dispatchEvent(new CustomEvent('download-started', { detail: downloads[taskId] }));
+        };
+
+        window.updateDownloadProgress = (progressData) => {
+            const downloads = getActiveDownloads();
+            const taskId = `${progressData.repo_id}/${progressData.filename}`;
+            downloads[taskId] = progressData;
+            setActiveDownloads(downloads);
+            window.dispatchEvent(new CustomEvent('download-progress', { detail: progressData }));
+        };
+        
+        window.finishDownload = (finishData) => {
+            const downloads = getActiveDownloads();
+            const taskId = `${finishData.repo_id}/${finishData.filename}`;
+            delete downloads[taskId];
+            setActiveDownloads(downloads);
+            window.dispatchEvent(new CustomEvent('download-finished', { detail: finishData }));
+        };
+
+    </script>
+
     <div class="main-layout">
         <aside class="sidebar">
             <div class="logo-container">

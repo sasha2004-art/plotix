@@ -1,6 +1,6 @@
-# Plotix: AI Quest Generator
+# <img src="app/static/img/iconca.svg" alt="Логотип" width="50"/> Plotix: AI Quest Generator 
 
-![Логотип](app/static/img/iconca.svg)
+
 
 **Plotix** — это мощное десктопное приложение для геймдизайнеров, сценаристов и энтузиастов, позволяющее генерировать нелинейные квесты и сюжеты с помощью искусственного интеллекта. Просто опишите сеттинг, и приложение создаст готовую структуру квеста в формате JSON, которую можно сразу использовать в вашем проекте.
 
@@ -71,7 +71,7 @@
 
 ### Требования
 *   **Python 3.10+**
-*   Для поддержки GPU (опционально, для локальных моделей): **NVIDIA CUDA Toolkit** и **Visual Studio Build Tools** (с компонентом "C++ desktop development") на Windows.
+*   Для поддержки GPU (опционально, для локальных моделей): **[NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive)** и **[Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)** (с компонентом "C++ desktop development") на Windows.
 
 ### Простой способ (рекомендуемый)
 

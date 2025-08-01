@@ -366,6 +366,22 @@ pre {
     color: var(--accent-failed);
 }
 
+/* ИЗМЕНЕНИЕ: Добавлен новый стиль для кнопки удаления на карточке модели */
+.delete-btn-card {
+    font-size: 14px;
+    padding: 8px 12px;
+    width: 100px;
+    background-color: var(--accent-failed);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.delete-btn-card:hover {
+    opacity: 0.8;
+}
+
+
 /* --- Стили для страницы настроек --- */
 .settings-wrapper {
     height: 100vh; /* Занимает 100% высоты видимой области */

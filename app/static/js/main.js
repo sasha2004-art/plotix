@@ -13,6 +13,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     // --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
+    // ИЗМЕНЕНИЕ: Глобальный слушатель для уведомлений о завершении загрузки
+    window.addEventListener('download-finished', (e) => {
+        const { status, message } = e.detail;
+        if (status !== 'cancelled') {
+            // Показываем alert, так как мы не на странице настроек
+            alert(`Загрузка завершена!\nСтатус: ${status}\nСообщение: ${message}`);
+        }
+    });
+
+
     const generateBtn = document.getElementById('generate-btn');
     const settingInput = document.getElementById('setting-input');
     const resultBox = document.getElementById('result-box');
