@@ -42,15 +42,22 @@ def main():
     project_root = Path(__file__).parent
     venv_dir = project_root / ".venv"
 
-    # --- Интерактивный выбор ---
-    choice = (
-        input(
-            f"{Colors.WARNING}Хотите установить поддержку локальных LLM (llama.cpp)? (y/n): {Colors.ENDC}"
+    # --- Интерактивный выбор с fallback для неинтерактивных сред ---
+    use_local_llm = False  # Начальное значение
+    try:
+        choice = (
+            input(
+                f"{Colors.WARNING}Хотите установить поддержку локальных LLM (llama.cpp)? (y/n): {Colors.ENDC}"
+            )
+            .lower()
+            .strip()
         )
-        .lower()
-        .strip()
-    )
-    use_local_llm = choice == "y"
+        use_local_llm = choice == "y"
+    except EOFError:
+        print(
+            f"\n{Colors.WARNING}Запуск в неинтерактивном режиме. Поддержка локальных LLM будет включена по умолчанию.{Colors.ENDC}"
+        )
+        use_local_llm = True  # Устанавливаем в true для неинтерактивного запуска
 
     setup_environment(project_root, use_local_llm)
 
