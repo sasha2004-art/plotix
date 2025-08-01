@@ -249,9 +249,12 @@ def validate_api_key(api_provider: str, api_key: str) -> Dict[str, Any]:
 
 
 def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
-    """Получает и фильтрует список доступных моделей."""
+    """
+    Получает и фильтрует список доступных моделей.
+    Для облачных провайдеров возвращает словарь с категориями 'free' и 'paid'.
+    Для локального провайдера возвращает словарь с ключом 'models'.
+    """
     try:
-        # --- Local provider ---
         if api_provider == "local":
             model_dir_str = os.getenv("LOCAL_MODEL_PATH", "quest-generator/models")
             model_dir = Path(model_dir_str)
@@ -288,24 +291,47 @@ def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
                 if "gpt" in model.id.lower() or "text" in model.id.lower()
             ]
         elif api_provider == "gemini":
-            genai.configure(api_key=api_key)  # type: ignore[reportPrivateImportUsage]
+            genai.configure(api_key=api_key)
             models = [
                 m.name
-                for m in genai.list_models()  # type: ignore[reportPrivateImportUsage]
+                for m in genai.list_models()
                 if "generateContent" in m.supported_generation_methods
             ]
             models_list = models
         else:
             return {"error": f"Unknown API provider: {api_provider}"}
 
-        # Post-processing for cloud models
-        unique_models = {}
+        unique_models_map = {}
         for model in sorted(models_list):
             base_name = re.sub(r"-\d{4}-\d{2}-\d{2}$", "", model)
             base_name = re.sub(r"-\d{4}$", "", base_name)
-            if base_name not in unique_models:
-                unique_models[base_name] = model
-        return {"models": list(unique_models.values())}
+            if base_name not in unique_models_map:
+                unique_models_map[base_name] = model
+
+        unique_models_list = list(unique_models_map.values())
+
+        categorized_models: Dict[str, List[str]] = {"free": [], "paid": []}
+
+        FREE_KEYWORDS_GEMINI = ["flash", "1.0-pro"]
+        FREE_KEYWORDS_OPENAI = ["gpt-3.5-turbo"]
+
+        for model_name in unique_models_list:
+            is_free = False
+            if api_provider == "groq":
+                is_free = True
+            elif api_provider == "gemini":
+                if any(keyword in model_name for keyword in FREE_KEYWORDS_GEMINI):
+                    is_free = True
+            elif api_provider == "openai":
+                if any(keyword in model_name for keyword in FREE_KEYWORDS_OPENAI):
+                    is_free = True
+
+            if is_free:
+                categorized_models["free"].append(model_name)
+            else:
+                categorized_models["paid"].append(model_name)
+
+        return categorized_models
 
     except Exception as e:
         logger.error(f"Failed to get models for {api_provider}: {e}")
