@@ -357,6 +357,14 @@ class Api:
 
 if __name__ == "__main__":
     api = Api()
+    
+    icon_path = project_root / "app" / "static" / "img" / "iconca.ico"
+    if not icon_path.exists():
+        print(f"\033[93mВнимание: Файл иконки не найден по пути {icon_path}. Будет использована иконка по умолчанию.\033[0m")
+        final_icon_path = None
+    else:
+        final_icon_path = str(icon_path)
+
     window = webview.create_window(
         "AI Quest Generator",
         app,
@@ -368,4 +376,4 @@ if __name__ == "__main__":
         easy_drag=False,
     )
     api.set_window(window)
-    webview.start(debug=True)
+    webview.start(debug=True, icon=final_icon_path)
