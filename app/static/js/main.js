@@ -22,11 +22,16 @@ window.addEventListener('pywebviewready', async () => {
     const jsonTab = document.getElementById('json-tab');
     const graphTab = document.getElementById('graph-tab');
     const sidebar = document.querySelector('.sidebar');
+    const editGraphBtn = document.getElementById('edit-graph-btn');
+    const graphEditorPanel = document.getElementById('graph-editor-panel');
+    const addSceneBtn = document.getElementById('add-scene-btn');
+
 
     window.chats = {};
     window.activeChatId = null;
     let saveTimeout = null;
     let chatsVisible = false;
+    let editMode = false;
 
     // ==================== КЛЮЧЕВЫЕ ФУНКЦИИ (ЗАГРУЗКА/СОХРАНЕНИЕ) ====================
 
@@ -77,107 +82,366 @@ window.addEventListener('pywebviewready', async () => {
     // ==================== ЛОГИКА ГРАФА И РЕНДЕРИНГА ====================
     
     async function renderQuestGraph(jsonString) {
-    graphBox.innerHTML = 'Подготовка графа...';
+        graphBox.innerHTML = 'Подготовка графа...';
 
-    // Даем браузеру ничтожную паузу, чтобы он успел обработать
-    // переключение вкладок и подготовить контейнер.
-    await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise(resolve => setTimeout(resolve, 10));
 
-    try {
-        let questData;
         try {
-            const intermediateParse = JSON.parse(jsonString);
-            questData = (typeof intermediateParse === 'string') ? JSON.parse(intermediateParse) : intermediateParse;
-        } catch (e) {
-            throw new Error("Invalid JSON format");
-        }
-
-        if (!questData || !questData.scenes || !questData.start_scene) {
-            throw new Error("Неверная структура JSON для графа.");
-        }
-
-        const sceneDataMap = new Map(questData.scenes.map(scene => [scene.scene_id, scene]));
-        const allSceneIds = new Set(questData.scenes.map(s => s.scene_id));
-        questData.scenes.forEach(scene => {
-            scene.choices?.forEach(choice => {
-                if (choice && choice.next_scene) allSceneIds.add(choice.next_scene)
-            });
-        });
-
-        const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
-        const themeVariables = {
-            fontSize: '22px',
-            primaryColor: isDarkTheme ? '#28252b' : '#ffffff',
-            primaryTextColor: isDarkTheme ? '#ffffff' : '#000000',
-            primaryBorderColor: isDarkTheme ? '#bfb8dd' : '#555555',
-            lineColor: isDarkTheme ? '#bfb8dd' : '#555555',
-            secondaryColor: '#715cd7',
-            secondaryTextColor: '#ffffff',
-            strokeWidth: '2px',
-        };
-
-        const formatEdgeLabel = (text, lineLength = 25) => {
-            if (!text) return ' ';
-            const escapedText = text.replace(/"/g, '#quot;');
-            const words = escapedText.split(' ');
-            const lines = [];
-            let currentLine = "";
-            for (const word of words) {
-                if (currentLine === "") currentLine = word;
-                else if (currentLine.length + 1 + word.length <= lineLength) currentLine += " " + word;
-                else { lines.push(currentLine); currentLine = word; }
+            let questData;
+            try {
+                const intermediateParse = JSON.parse(jsonString);
+                questData = (typeof intermediateParse === 'string') ? JSON.parse(intermediateParse) : intermediateParse;
+            } catch (e) {
+                throw new Error("Invalid JSON format");
             }
-            if (currentLine) lines.push(currentLine);
-            return lines.join('<br>');
-        };
 
-        let mermaidDefinition = `%%{init: {'theme': 'base', 'themeVariables': ${JSON.stringify(themeVariables)}}}%%\n`;
-        mermaidDefinition += 'graph TD\n';
+            if (!questData || !questData.scenes) {
+                throw new Error("Неверная структура JSON для графа.");
+            }
+            if (!questData.start_scene && questData.scenes.length > 0) {
+                questData.start_scene = questData.scenes[0].scene_id;
+            }
+            if (!questData.start_scene) {
+                 throw new Error("В квесте нет начальной сцены.");
+            }
 
-        allSceneIds.forEach(id => mermaidDefinition += `    ${id}["${id}"]\n`);
-        
-        sceneDataMap.forEach(scene => {
-            scene.choices?.forEach(choice => {
-                if (choice && choice.next_scene) {
-                    const formattedLabel = formatEdgeLabel(choice.text);
-                    mermaidDefinition += `    ${scene.scene_id} -->|"${formattedLabel}"| ${choice.next_scene}\n`;
+            const sceneDataMap = new Map(questData.scenes.map(scene => [scene.scene_id, scene]));
+            const allSceneIds = new Set(questData.scenes.map(s => s.scene_id));
+            questData.scenes.forEach(scene => {
+                scene.choices?.forEach(choice => {
+                    if (choice && choice.next_scene) allSceneIds.add(choice.next_scene)
+                });
+            });
+
+            const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+            const themeVariables = {
+                fontSize: '22px',
+                primaryColor: isDarkTheme ? '#28252b' : '#ffffff',
+                primaryTextColor: isDarkTheme ? '#ffffff' : '#000000',
+                primaryBorderColor: isDarkTheme ? '#bfb8dd' : '#555555',
+                lineColor: isDarkTheme ? '#bfb8dd' : '#555555',
+                secondaryColor: '#715cd7',
+                secondaryTextColor: '#ffffff',
+                strokeWidth: '2px',
+            };
+
+            const formatEdgeLabel = (text, lineLength = 25) => {
+                if (!text) return ' ';
+                const escapedText = text.replace(/"/g, '#quot;');
+                const words = escapedText.split(' ');
+                const lines = [];
+                let currentLine = "";
+                for (const word of words) {
+                    if (currentLine === "") currentLine = word;
+                    else if (currentLine.length + 1 + word.length <= lineLength) currentLine += " " + word;
+                    else { lines.push(currentLine); currentLine = word; }
+                }
+                if (currentLine) lines.push(currentLine);
+                return lines.join('<br>');
+            };
+
+            let mermaidDefinition = `%%{init: {'theme': 'base', 'themeVariables': ${JSON.stringify(themeVariables)}}}%%\n`;
+            mermaidDefinition += 'graph TD\n';
+
+            allSceneIds.forEach(id => mermaidDefinition += `    ${id}["${id}"]\n`);
+
+            sceneDataMap.forEach(scene => {
+                scene.choices?.forEach(choice => {
+                    if (choice && choice.next_scene) {
+                        const formattedLabel = formatEdgeLabel(choice.text);
+                        mermaidDefinition += `    ${scene.scene_id} -->|"${formattedLabel}"| ${choice.next_scene}\n`;
+                    }
+                });
+            });
+
+            mermaidDefinition += `    style ${questData.start_scene} fill:${themeVariables.secondaryColor},stroke:${themeVariables.secondaryColor},color:${themeVariables.secondaryTextColor},font-weight:bold\n`;
+
+            graphBox.innerHTML = mermaidDefinition;
+            graphBox.removeAttribute('data-processed');
+
+            await mermaid.run({ nodes: [graphBox] });
+
+            // Привязка подсказок и событий редактирования
+            const svgNodes = graphBox.querySelectorAll('.node');
+            svgNodes.forEach(svgNode => {
+                const sceneId = svgNode.id.replace(/flowchart-(.*)-\d+/, '$1');
+
+                // Standard mouse events for tooltip
+                svgNode.addEventListener('mousemove', (e) => {
+                    if (editMode) return;
+                    tooltip.style.left = `${e.clientX + 15}px`;
+                    tooltip.style.top = `${e.clientY + 15}px`;
+                });
+                svgNode.addEventListener('mouseover', () => {
+                    if (editMode) return;
+                    const sceneData = sceneDataMap.get(sceneId);
+                    tooltip.innerHTML = sceneData
+                        ? `<strong>${sceneData.scene_id}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>${sceneData.text}</p>`
+                        : `<strong>${sceneId}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>Конец ветки.</p>`;
+                    tooltip.style.display = 'block';
+                });
+                svgNode.addEventListener('mouseout', () => {
+                    tooltip.style.display = 'none';
+                });
+
+                // Add editing capabilities if in edit mode
+                if (editMode) {
+                    svgNode.classList.add('editable');
+                    svgNode.addEventListener('click', () => openEditModal(sceneId));
                 }
             });
-        });
 
-        mermaidDefinition += `    style ${questData.start_scene} fill:${themeVariables.secondaryColor},stroke:${themeVariables.secondaryColor},color:${themeVariables.secondaryTextColor},font-weight:bold\n`;
-        
-        graphBox.innerHTML = mermaidDefinition;
-        graphBox.removeAttribute('data-processed');
-
-        await mermaid.run({ nodes: [graphBox] });
-
-        // Привязка подсказок
-        const svgNodes = graphBox.querySelectorAll('.node');
-        svgNodes.forEach(svgNode => {
-            const sceneId = svgNode.id.replace(/flowchart-(.*)-\d+/, '$1');
-            svgNode.addEventListener('mousemove', (e) => {
-                tooltip.style.left = `${e.clientX + 15}px`;
-                tooltip.style.top = `${e.clientY + 15}px`;
-            });
-            svgNode.addEventListener('mouseover', () => {
-                const sceneData = sceneDataMap.get(sceneId);
-                tooltip.innerHTML = sceneData
-                    ? `<strong>${sceneData.scene_id}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>${sceneData.text}</p>`
-                    : `<strong>${sceneId}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>Конец ветки.</p>`;
-                tooltip.style.display = 'block';
-            });
-            svgNode.addEventListener('mouseout', () => {
-                tooltip.style.display = 'none';
-            });
-        });
-
-    } catch (error) {
-        console.error("Ошибка рендеринга графа:", error);
-        graphBox.innerHTML = `<p class="status-error">Не удалось построить граф. Проверьте валидность и структуру JSON.</p>`;
+        } catch (error) {
+            console.error("Ошибка рендеринга графа:", error);
+            graphBox.innerHTML = `<p class="status-error">Не удалось построить граф. Проверьте валидность и структуру JSON.</p>`;
+        }
     }
-}
 
+
+    // ==================== ЛОГИКА РЕДАКТОРА ГРАФА ====================
+
+    function getCurrentQuestData() {
+        if (!window.activeChatId || !window.chats[window.activeChatId]) return null;
+        try {
+            const result = window.chats[activeChatId].result;
+            if (!result || result.includes('Здесь появится')) return null;
+            const data = JSON.parse(result);
+            if (!Array.isArray(data.scenes)) data.scenes = [];
+            return data;
+        } catch (e) {
+            console.error("Could not parse quest data:", e);
+            return null;
+        }
+    }
+
+    function saveQuestData(questData) {
+        if (!window.activeChatId || !window.chats[activeChatId]) return;
+        window.chats[activeChatId].result = JSON.stringify(questData, null, 2);
+        saveChats();
+        renderQuestGraph(window.chats[activeChatId].result);
+    }
+
+    function openEditModal(sceneId) {
+        const questData = getCurrentQuestData();
+        if (!questData) return;
+
+        const scene = questData.scenes.find(s => s.scene_id === sceneId);
+        if (!scene) {
+            alert(`Ошибка: Сцена с ID "${sceneId}" не найдена.`);
+            return;
+        }
+
+        const overlay = document.getElementById('edit-modal-overlay');
+        const closeBtn = document.getElementById('modal-close-btn');
+        const sceneIdInput = document.getElementById('modal-scene-id');
+        const originalSceneIdInput = document.getElementById('modal-scene-id-original');
+        const sceneTextInput = document.getElementById('modal-scene-text');
+        const addChoiceBtn = document.getElementById('modal-add-choice-btn');
+        const saveBtn = document.getElementById('modal-save-btn');
+        const cancelBtn = document.getElementById('modal-cancel-btn');
+        const deleteBtn = document.getElementById('modal-delete-scene-btn');
+        const sceneIdError = document.getElementById('scene-id-error');
+
+        originalSceneIdInput.value = scene.scene_id;
+        sceneIdInput.value = scene.scene_id;
+        sceneTextInput.value = scene.text || '';
+        sceneIdError.style.display = 'none';
+        sceneIdError.textContent = '';
+
+        const allSceneIds = questData.scenes.map(s => s.scene_id);
+        renderModalChoices(scene.choices || [], allSceneIds);
+
+        const newSaveBtn = saveBtn.cloneNode(true);
+        saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+        newSaveBtn.addEventListener('click', saveSceneFromModal);
+
+        const newDeleteBtn = deleteBtn.cloneNode(true);
+        deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
+        newDeleteBtn.addEventListener('click', () => deleteScene(scene.scene_id));
+
+        const newAddChoiceBtn = addChoiceBtn.cloneNode(true);
+        addChoiceBtn.parentNode.replaceChild(newAddChoiceBtn, addChoiceBtn);
+        newAddChoiceBtn.addEventListener('click', () => addChoiceToModal(allSceneIds));
+
+        const closeModal = () => {
+            overlay.style.display = 'none';
+        };
+        cancelBtn.onclick = closeModal;
+        closeBtn.onclick = closeModal;
+        overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+
+        overlay.style.display = 'flex';
+    }
+
+    function renderModalChoices(choices, allSceneIds) {
+        const container = document.getElementById('modal-choices-container');
+        container.innerHTML = '';
+
+        (choices || []).forEach((choice, index) => {
+            const choiceEl = document.createElement('div');
+            choiceEl.className = 'choice-item';
+
+            const textInputHTML = `
+                <div class="form-group">
+                    <label for="choice-text-${index}">Текст выбора</label>
+                    <input type="text" id="choice-text-${index}" value="${(choice.text || '').replace(/"/g, '&quot;')}">
+                </div>`;
+
+            const sceneOptions = allSceneIds.map(id =>
+                `<option value="${id}" ${id === choice.next_scene ? 'selected' : ''}>${id}</option>`
+            ).join('');
+
+            const nextSceneSelectHTML = `
+                <div class="form-group">
+                    <label for="choice-next-${index}">Следующая сцена</label>
+                    <select id="choice-next-${index}">${sceneOptions}</select>
+                </div>`;
+
+            const deleteBtnHTML = `
+                <div class="choice-item-actions">
+                    <button title="Удалить выбор" data-index="${index}">&times;</button>
+                </div>`;
+
+            choiceEl.innerHTML = textInputHTML + nextSceneSelectHTML + deleteBtnHTML;
+
+            choiceEl.querySelector('button').addEventListener('click', (e) => {
+                e.target.closest('.choice-item').remove();
+            });
+
+            container.appendChild(choiceEl);
+        });
+    }
+
+    function addChoiceToModal(allSceneIds) {
+        const currentChoices = getChoicesFromModal();
+        currentChoices.push({ text: 'Новый выбор', next_scene: allSceneIds[0] || '' });
+        renderModalChoices(currentChoices, allSceneIds);
+    }
+
+    function getChoicesFromModal() {
+        const choices = [];
+        const container = document.getElementById('modal-choices-container');
+        const choiceItems = container.querySelectorAll('.choice-item');
+        choiceItems.forEach((item, index) => {
+            const textInput = item.querySelector(`#choice-text-${index}`);
+            const nextSceneSelect = item.querySelector(`#choice-next-${index}`);
+            if (textInput && nextSceneSelect) {
+                const text = textInput.value.trim();
+                const next_scene = nextSceneSelect.value;
+                choices.push({ text, next_scene });
+            }
+        });
+        return choices;
+    }
+
+    function saveSceneFromModal() {
+        const questData = getCurrentQuestData();
+        if (!questData) return;
+
+        const originalId = document.getElementById('modal-scene-id-original').value;
+        const newId = document.getElementById('modal-scene-id').value.trim();
+        const newText = document.getElementById('modal-scene-text').value.trim();
+        const sceneIdError = document.getElementById('scene-id-error');
+        
+        if (!newId) {
+            sceneIdError.textContent = "ID сцены не может быть пустым.";
+            sceneIdError.style.display = 'block';
+            return;
+        }
+        if (newId !== originalId && questData.scenes.some(s => s.scene_id === newId)) {
+            sceneIdError.textContent = "Этот ID уже используется. Выберите другой.";
+            sceneIdError.style.display = 'block';
+            return;
+        }
+        sceneIdError.style.display = 'none';
+
+        const scene = questData.scenes.find(s => s.scene_id === originalId);
+        if (scene) {
+            scene.scene_id = newId;
+            scene.text = newText;
+            scene.choices = getChoicesFromModal();
+        }
+
+        if (newId !== originalId) {
+            questData.scenes.forEach(s => {
+                (s.choices || []).forEach(c => {
+                    if (c.next_scene === originalId) c.next_scene = newId;
+                });
+            });
+            if (questData.start_scene === originalId) questData.start_scene = newId;
+        }
+
+        saveQuestData(questData);
+        document.getElementById('edit-modal-overlay').style.display = 'none';
+    }
+
+    function deleteScene(sceneId) {
+        if (!confirm(`Вы уверены, что хотите удалить сцену "${sceneId}"? Это действие необратимо и удалит все переходы к этой сцене.`)) return;
+
+        const questData = getCurrentQuestData();
+        if (!questData) return;
+
+        questData.scenes = questData.scenes.filter(s => s.scene_id !== sceneId);
+
+        questData.scenes.forEach(s => {
+            if (s.choices) s.choices = s.choices.filter(c => c.next_scene !== sceneId);
+        });
+
+        if (questData.start_scene === sceneId) {
+            const newStartScene = questData.scenes.length > 0 ? questData.scenes[0].scene_id : '';
+            questData.start_scene = newStartScene;
+            if (newStartScene) {
+                alert(`Стартовая сцена была удалена. Новой стартовой сценой назначена "${newStartScene}".`);
+            } else {
+                alert(`Стартовая сцена была удалена. В квесте не осталось сцен.`);
+            }
+        }
+
+        saveQuestData(questData);
+        document.getElementById('edit-modal-overlay').style.display = 'none';
+    }
+
+    function addScene() {
+        let questData = getCurrentQuestData();
+
+        if (!questData) {
+            const newId = 'start_scene';
+            questData = {
+                quest_name: "Новый квест",
+                start_scene: newId,
+                scenes: [{ scene_id: newId, text: "Это первая сцена вашего нового квеста.", choices: [] }]
+            };
+        } else {
+            const newId = `new_scene_${Date.now()}`;
+            questData.scenes.push({ scene_id: newId, text: "Новая сцена. Отредактируйте ее.", choices: [] });
+        }
+
+        saveQuestData(questData);
+    }
+
+    function toggleEditMode() {
+        editMode = !editMode;
+
+        const editIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>`;
+        const doneIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M0 0h24v24H0V0z" fill="none"></path><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"></path></svg>`;
+
+        if (editMode) {
+            editGraphBtn.innerHTML = doneIcon;
+            editGraphBtn.title = "Завершить редактирование";
+            graphEditorPanel.style.display = 'flex';
+            jsonTab.style.display = 'none';
+        } else {
+            editGraphBtn.innerHTML = editIcon;
+            editGraphBtn.title = "Редактировать граф";
+            graphEditorPanel.style.display = 'none';
+            jsonTab.style.display = 'block';
+        }
+
+        const currentResult = window.activeChatId && window.chats[window.activeChatId]?.result;
+        if (currentResult && !currentResult.includes('Здесь появится')) {
+            renderQuestGraph(currentResult);
+        }
+    }
 
     // ==================== ОСТАЛЬНАЯ ЛОГИКА ПРИЛОЖЕНИЯ ====================
 
@@ -376,6 +640,8 @@ window.addEventListener('pywebviewready', async () => {
 
     // ==================== ЗАПУСК ИНИЦИАЛИЗАЦИИ И ПРИВЯЗКА СОБЫТИЙ ====================
 
+    editGraphBtn.addEventListener('click', toggleEditMode);
+    addSceneBtn.addEventListener('click', addScene);
     if (minimizeBtn) minimizeBtn.addEventListener('click', () => api.minimize());
     if (maximizeBtn) maximizeBtn.addEventListener('click', () => api.toggle_maximize());
     if (closeBtn) closeBtn.addEventListener('click', () => api.close());
