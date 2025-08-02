@@ -40,6 +40,7 @@ if sys.prefix == sys.base_prefix:
         f"\033[94mНе в виртуальном окружении. Перезапуск с использованием: {venv_python}\033[0m"
     )
     try:
+        # nosemgrep
         os.execv(str(venv_python), [str(venv_python)] + sys.argv)  # nosec B606
     except Exception as e:
         print(f"\n\033[91mКритическая ошибка при попытке перезапуска: {e}\033[0m")

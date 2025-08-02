@@ -110,7 +110,8 @@ def main():
         ),
         (
             "6. Static Analysis (semgrep)",
-            ["semgrep", "scan", "--config", "p/python", "--metrics=off"] + dirs_to_scan,
+            ["semgrep", "scan", "--config", "p/python", "--metrics=off", "--error"]
+            + dirs_to_scan,
         ),
         (
             "7. Unit Tests (pytest)",
