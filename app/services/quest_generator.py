@@ -115,8 +115,6 @@ def create_quest_from_setting(
                 n_ctx=4096,
                 n_gpu_layers=-1,
                 verbose=False,
-                # ИЗМЕНЕНИЕ: TinyLlama и многие другие современные модели используют ChatML.
-                # Это более универсальный и правильный формат для таких моделей.
                 chat_format="chatml",
             )
             chat_completion = llm.create_chat_completion(
@@ -125,7 +123,7 @@ def create_quest_from_setting(
                 response_format={"type": "json_object"},
                 stream=False,
             )
-            response_content = chat_completion["choices"][0]["message"]["content"]
+            response_content = chat_completion["choices"][0]["message"]["content"]  # type: ignore
 
         else:
             logger.error(f"Unknown API provider: {api_provider}")
@@ -135,17 +133,14 @@ def create_quest_from_setting(
             logger.error("LLM returned no content.")
             return {"error": "LLM returned no content."}
 
-        # Clean response content for markdown code blocks
         json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response_content)
         if json_match:
             cleaned_content = json_match.group(1)
         else:
-            # If no markdown block found, assume the content is raw JSON
             cleaned_content = response_content
 
         try:
             parsed_json = json.loads(cleaned_content)
-            # ИЗМЕНЕНИЕ: Проверка на пустой результат от модели (A4)
             if not parsed_json:
                 logger.error(
                     f"LLM ({model}) returned an empty JSON object. "
@@ -174,7 +169,7 @@ def create_quest_from_setting(
             f"An error occurred while generating quest with {api_provider}: {e}"
         )
         error_message_lower = str(e).lower()
-        # Добавлена проверка на ошибку квоты
+
         if (
             "quota" in error_message_lower
             or "insufficient_quota" in error_message_lower
@@ -211,7 +206,7 @@ def validate_api_key(api_provider: str, api_key: str) -> Dict[str, Any]:
     try:
         if api_provider == "groq":
             client = Groq(api_key=api_key)
-            client.models.list()  # Простой запрос для проверки аутентификации
+            client.models.list()
             return {"status": "ok"}
         elif api_provider == "openai":
             client = openai.OpenAI(api_key=api_key)
@@ -219,7 +214,6 @@ def validate_api_key(api_provider: str, api_key: str) -> Dict[str, Any]:
             return {"status": "ok"}
         elif api_provider == "gemini":
             genai.configure(api_key=api_key)  # type: ignore[reportPrivateImportUsage]
-            # Проверяем, есть ли доступные модели для генерации текста
             models = [
                 m
                 for m in genai.list_models()  # type: ignore[reportPrivateImportUsage]
@@ -229,17 +223,14 @@ def validate_api_key(api_provider: str, api_key: str) -> Dict[str, Any]:
                 raise ValueError("No generative models found for this API key.")
             return {"status": "ok"}
         elif api_provider == "local":
-            # Для локальных моделей ключ не нужен, всегда считаем 'ok'
             return {"status": "ok"}
         else:
             return {
-                "status": "error",
-                "message": f"Unknown API provider: {api_provider}",
+                "error": f"Unknown API provider: {api_provider}",
             }
 
     except Exception as e:
         logger.error(f"API key validation failed for {api_provider}: {e}")
-        # Возвращаем более понятное сообщение об ошибке
         if "401" in str(e) or "invalid" in str(e).lower():
             return {"status": "error", "message": "Неверный API ключ."}
         return {
@@ -251,20 +242,14 @@ def validate_api_key(api_provider: str, api_key: str) -> Dict[str, Any]:
 def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
     """
     Получает и фильтрует список доступных моделей.
-    Для облачных провайдеров возвращает словарь с категориями 'free' и 'paid'.
-    Для локального провайдера возвращает словарь с ключом 'models'.
     """
     try:
         if api_provider == "local":
             model_dir_str = os.getenv("LOCAL_MODEL_PATH", "quest-generator/models")
             model_dir = Path(model_dir_str)
             models_info = []
-            if not model_dir.is_dir():
-                logger.warning(
-                    f"Директория локальных моделей '{model_dir.resolve()}' не найдена."
-                )
-            else:
-                for f in sorted(model_dir.glob("*.gguf")):
+            if model_dir.is_dir():
+                for f in model_dir.glob("*.gguf"):
                     if f.is_file():
                         try:
                             models_info.append(
@@ -272,11 +257,11 @@ def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
                             )
                         except OSError as e:
                             logger.warning(
-                                f"Не удалось получить информацию о файле {f}: {e}"
+                                f"Не удалось получить информацию о файле {f.name}: {e}"
                             )
+            models_info.sort(key=lambda x: x["name"])
             return {"models": models_info}
 
-        # --- Cloud providers ---
         models_list = []
         if api_provider == "groq":
             client = Groq(api_key=api_key)
@@ -291,13 +276,13 @@ def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
                 if "gpt" in model.id.lower() or "text" in model.id.lower()
             ]
         elif api_provider == "gemini":
-            genai.configure(api_key=api_key)
+            genai.configure(api_key=api_key)  # type: ignore[reportPrivateImportUsage]
             models = [
                 m.name
-                for m in genai.list_models()
+                for m in genai.list_models()  # type: ignore[reportPrivateImportUsage]
                 if "generateContent" in m.supported_generation_methods
             ]
-            models_list = models
+            models_list = [m.replace("models/", "") for m in models]
         else:
             return {"error": f"Unknown API provider: {api_provider}"}
 
@@ -309,9 +294,7 @@ def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
                 unique_models_map[base_name] = model
 
         unique_models_list = list(unique_models_map.values())
-
         categorized_models: Dict[str, List[str]] = {"free": [], "paid": []}
-
         FREE_KEYWORDS_GEMINI = ["flash", "1.0-pro"]
         FREE_KEYWORDS_OPENAI = ["gpt-3.5-turbo"]
 
@@ -341,7 +324,6 @@ def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
 def delete_local_models(filenames: List[str]) -> Dict[str, Any]:
     """
     Удаляет указанные файлы локальных моделей из директории.
-    Производит проверку для предотвращения удаления файлов вне целевой директории.
     """
     model_dir_str = os.getenv("LOCAL_MODEL_PATH", "quest-generator/models")
     model_dir = Path(model_dir_str)
@@ -352,7 +334,6 @@ def delete_local_models(filenames: List[str]) -> Dict[str, Any]:
         return {"status": "error", "message": "Директория с моделями не найдена."}
 
     for filename in filenames:
-        # Security check: prevent path traversal attacks
         if filename != Path(filename).name or not filename.endswith(".gguf"):
             errors.append(f"Некорректное имя файла: {filename}")
             continue
@@ -371,14 +352,15 @@ def delete_local_models(filenames: List[str]) -> Dict[str, Any]:
             logger.error(error_msg)
 
     message_parts = []
+    status = "ok"
     if deleted_files:
         message_parts.append(f"Успешно удалено: {len(deleted_files)} файл(ов).")
     if errors:
         message_parts.append(f"Ошибки: {len(errors)}. {'; '.join(errors)}")
+        status = "partial" if deleted_files else "error"
 
     final_message = (
         " ".join(message_parts) if message_parts else "Файлы не были выбраны."
     )
-    status = "ok" if not errors else "error"
 
     return {"status": status, "message": final_message}

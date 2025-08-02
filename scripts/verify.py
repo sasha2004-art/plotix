@@ -1,4 +1,4 @@
-import subprocess
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 import os
@@ -50,7 +50,7 @@ def run_check(
     env["PYTHONIOENCODING"] = "utf-8"
 
     try:
-        process = subprocess.run(
+        process = subprocess.run(  # nosec B603
             full_command,
             cwd=cwd,
             check=True,
@@ -104,7 +104,10 @@ def main():
         ),
         ("3. Type Checking (pyright)", ["pyright"]),
         ("4. Dependency Security (pip-audit)", ["pip_audit"]),
-        ("5. Code Security (bandit)", ["bandit", "-r"] + dirs_to_scan),
+        (
+            "5. Code Security (bandit)",
+            ["bandit", "-c", "pyproject.toml", "-r"] + dirs_to_scan,
+        ),
         (
             "6. Static Analysis (semgrep)",
             ["semgrep", "scan", "--config", "p/python", "--metrics=off"] + dirs_to_scan,

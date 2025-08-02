@@ -1,9 +1,11 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
+from pathlib import Path
 
 from app.services.quest_generator import (
     create_quest_from_setting,
     validate_api_key,
     get_available_models,
+    delete_local_models,
 )
 
 
@@ -137,7 +139,7 @@ def test_get_available_models_groq_success(mock_groq):
     mock_model.id = "llama3-8b-8192"
     mock_groq.return_value.models.list.return_value.data = [mock_model]
     result = get_available_models("groq", "fake_key")
-    assert result == {"models": ["llama3-8b-8192"]}
+    assert result == {"free": ["llama3-8b-8192"], "paid": []}
 
 
 @patch("app.services.quest_generator.openai.OpenAI")
@@ -147,18 +149,18 @@ def test_get_available_models_openai_success(mock_openai):
     mock_model.id = "gpt-4"
     mock_openai.return_value.models.list.return_value.data = [mock_model]
     result = get_available_models("openai", "fake_key")
-    assert result == {"models": ["gpt-4"]}
+    assert result == {"free": [], "paid": ["gpt-4"]}
 
 
 @patch("app.services.quest_generator.genai")
 def test_get_available_models_gemini_success(mock_genai):
     """Тестирует успешное получение моделей от Gemini."""
     mock_model = MagicMock()
-    mock_model.name = "gemini-pro"
+    mock_model.name = "models/gemini-pro"
     mock_model.supported_generation_methods = ["generateContent"]
     mock_genai.list_models.return_value = [mock_model]
     result = get_available_models("gemini", "fake_key")
-    assert result == {"models": ["gemini-pro"]}
+    assert result == {"free": [], "paid": ["gemini-pro"]}
 
 
 def test_get_available_models_unknown_provider():
@@ -175,14 +177,10 @@ def test_get_available_models_api_error(mock_groq):
     assert result == {"error": "API Error"}
 
 
-# --- НОВЫЕ ТЕСТЫ ДЛЯ ОБРАБОТКИ ОШИБОК JSON И API ---
-
-
 @patch("app.services.quest_generator.Groq")
 def test_create_quest_json_decode_error_raw_content(mock_groq):
     """Тестирует случай, когда LLM возвращает невалидный, но немаркдаун JSON."""
     mock_completion = MagicMock()
-    # Simulate invalid JSON without markdown
     mock_completion.choices[0].message.content = "{this is not json}"
     mock_groq.return_value.chat.completions.create.return_value = mock_completion
 
@@ -217,9 +215,7 @@ def test_create_quest_json_decode_error_markdown_valid_json(mock_genai):
 def test_create_quest_json_decode_error_markdown_invalid_json(mock_genai):
     """Тестирует, что очистка markdown работает, но внутренний JSON невалиден."""
     mock_response_invalid = MagicMock()
-    mock_response_invalid.text = (
-        '```json\n{"questTitle": "Partial JSON",\n```'  # Invalid JSON
-    )
+    mock_response_invalid.text = '```json\n{"questTitle": "Partial JSON",\n```'
     mock_model_invalid = MagicMock()
     mock_model_invalid.generate_content.return_value = mock_response_invalid
     mock_genai.GenerativeModel.return_value = mock_model_invalid
@@ -338,24 +334,58 @@ def test_create_quest_api_quota_exceeded_error(mock_openai):
     )
 
 
-# --- НОВЫЕ ТЕСТЫ ДЛЯ ЛОКАЛЬНОГО ПРОВАЙДЕРА ---
-
-
-@patch("app.services.quest_generator.os.path.isdir")
-@patch("app.services.quest_generator.os.listdir")
-def test_get_available_models_local_success(mock_listdir, mock_isdir):
+@patch("app.services.quest_generator.Path")
+def test_get_available_models_local_success(MockPath):
     """Тестирует успешное получение списка локальных GGUF моделей."""
-    mock_isdir.return_value = True
-    mock_listdir.return_value = ["model1.gguf", "model2.gguf", "readme.txt"]
-    with patch("app.services.quest_generator.os.path.isfile", return_value=True):
+    mock_model_dir = MockPath.return_value
+    mock_model_dir.is_dir.return_value = True
+
+    mock_file_1 = MagicMock(spec=Path)
+    mock_file_1.name = "model1.gguf"
+    mock_file_1.is_file.return_value = True
+    mock_file_1.stat.return_value = MagicMock(st_size=12345)
+
+    mock_file_2 = MagicMock(spec=Path)
+    mock_file_2.name = "model2.gguf"
+    mock_file_2.is_file.return_value = True
+    mock_file_2.stat.return_value = MagicMock(st_size=67890)
+
+    mock_model_dir.glob.return_value = [mock_file_2, mock_file_1]  # Unsorted
+
+    result = get_available_models("local", "")
+    expected = {
+        "models": [
+            {"name": "model1.gguf", "size": 12345},
+            {"name": "model2.gguf", "size": 67890},
+        ]
+    }
+    assert result == expected
+    mock_model_dir.glob.assert_called_once_with("*.gguf")
+
+
+@patch("app.services.quest_generator.Path")
+def test_get_available_models_local_os_error(MockPath):
+    """Тестирует обработку OSError при получении информации о файле."""
+    mock_model_dir = MockPath.return_value
+    mock_model_dir.is_dir.return_value = True
+
+    mock_file = MagicMock(spec=Path)
+    type(mock_file).name = PropertyMock(return_value="bad_file.gguf")
+    mock_file.is_file.return_value = True
+    mock_file.stat.side_effect = OSError("Permission denied")
+    mock_model_dir.glob.return_value = [mock_file]
+
+    with patch("app.services.quest_generator.logger.warning") as mock_logger:
         result = get_available_models("local", "")
-        assert result == {"models": ["model1.gguf", "model2.gguf"]}
+        assert result == {"models": []}
+        mock_logger.assert_called_once_with(
+            "Не удалось получить информацию о файле bad_file.gguf: Permission denied"
+        )
 
 
-@patch("app.services.quest_generator.os.path.isdir")
-def test_get_available_models_local_dir_not_found(mock_isdir):
+@patch("app.services.quest_generator.Path.is_dir", return_value=False)
+def test_get_available_models_local_dir_not_found(mock_is_dir):
     """Тестирует случай, когда директория с локальными моделями не найдена."""
-    mock_isdir.return_value = False
     result = get_available_models("local", "")
     assert result == {"models": []}
 
@@ -383,13 +413,84 @@ def test_create_quest_local_success(mock_exists, mock_llama):
     mock_llama_instance.create_chat_completion.assert_called_once()
 
 
+def test_create_quest_local_llama_not_installed(monkeypatch):
+    """Тестирует ошибку, если llama_cpp не установлен."""
+    monkeypatch.setattr("app.services.quest_generator.Llama", None)
+    result = create_quest_from_setting("любой", "", "local", "any")
+    assert result == {"error": "Поддержка локальных LLM не установлена."}
+
+
 @patch("app.services.quest_generator.os.path.exists")
 def test_create_quest_local_model_not_found(mock_exists, monkeypatch):
     """Тестирует ошибку, если файл локальной модели не найден."""
-    # --- ИЗМЕНЕНИЕ: Симулируем, что Llama установлен, чтобы пройти первую проверку ---
     monkeypatch.setattr("app.services.quest_generator.Llama", MagicMock())
-    # -----------------------------------------------------------------------
     mock_exists.return_value = False
-    result = create_quest_from_setting("любой сеттинг", "", "local", "nonexistent.gguf")
+    result = create_quest_from_setting("любой", "", "local", "nonexistent.gguf")
     assert "error" in result
     assert "Локальная модель не найдена" in result["error"]
+
+
+@patch("app.services.quest_generator.Path.unlink")
+@patch("app.services.quest_generator.Path.is_file")
+@patch("app.services.quest_generator.Path.is_dir")
+def test_delete_local_models_success(mock_is_dir, mock_is_file, mock_unlink):
+    """Тестирует успешное удаление одного файла."""
+    mock_is_dir.return_value = True
+    mock_is_file.return_value = True
+    result = delete_local_models(["model1.gguf"])
+    assert result["status"] == "ok"
+    assert "Успешно удалено: 1 файл(ов)." in result["message"]
+    mock_unlink.assert_called_once()
+
+
+def test_delete_local_models_partial_success(tmp_path, monkeypatch):
+    """Тестирует частичное удаление с использованием временной файловой системы."""
+    # 1. Setup a temporary directory structure. tmp_path is a Path object.
+    model_dir = tmp_path / "my_models"
+    model_dir.mkdir()
+    (model_dir / "model1.gguf").touch()  # This file exists
+
+    # 2. Point the SUT to our temporary directory via environment variable
+    monkeypatch.setenv("LOCAL_MODEL_PATH", str(model_dir))
+
+    # 3. Run the function. model2.gguf does not exist.
+    result = delete_local_models(["model1.gguf", "model2.gguf"])
+
+    # 4. Assert
+    assert result["status"] == "partial"
+    assert "Успешно удалено: 1 файл(ов)." in result["message"]
+    assert (
+        "Ошибки: 1. Файл не найден или не является файлом: model2.gguf"
+        in result["message"]
+    )
+    assert not (model_dir / "model1.gguf").exists()  # Verify it was deleted
+
+
+@patch("app.services.quest_generator.Path.is_file")
+@patch("app.services.quest_generator.Path.is_dir")
+def test_delete_local_models_all_fail(mock_is_dir, mock_is_file):
+    """Тестирует случай, когда ни один файл не был найден."""
+    mock_is_dir.return_value = True
+    mock_is_file.return_value = False
+    result = delete_local_models(["model.gguf"])
+    assert result["status"] == "error"
+    assert (
+        "Ошибки: 1. Файл не найден или не является файлом: model.gguf"
+        in result["message"]
+    )
+
+
+@patch("app.services.quest_generator.Path.is_dir", return_value=True)
+def test_delete_local_models_security_traversal(mock_is_dir):
+    """Тестирует защиту от path traversal."""
+    result = delete_local_models(["../secret.txt.gguf"])
+    assert result["status"] == "error"
+    assert "Некорректное имя файла" in result["message"]
+
+
+@patch("app.services.quest_generator.Path.is_dir", return_value=False)
+def test_delete_local_models_dir_not_found(mock_is_dir):
+    """Тестирует случай, когда директория с моделями не существует."""
+    result = delete_local_models(["any.gguf"])
+    assert result["status"] == "error"
+    assert "Директория с моделями не найдена" in result["message"]

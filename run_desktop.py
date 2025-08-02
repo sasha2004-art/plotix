@@ -1,6 +1,26 @@
-import sys
+import json
+import logging
+import math
 import os
+import shutil
+import sys
+import threading
+import time
 from pathlib import Path
+
+# Third-party
+import requests
+import webview
+from huggingface_hub import HfFolder, hf_hub_url, whoami
+from huggingface_hub.errors import (
+    EntryNotFoundError,
+    HfHubHTTPError,
+    RepositoryNotFoundError,
+)
+from requests.exceptions import HTTPError
+from webview.errors import JavascriptException
+
+from app.main import app
 
 # Блок проверки виртуального окружения (без изменений)
 if sys.prefix == sys.base_prefix:
@@ -20,23 +40,11 @@ if sys.prefix == sys.base_prefix:
         f"\033[94mНе в виртуальном окружении. Перезапуск с использованием: {venv_python}\033[0m"
     )
     try:
-        os.execv(str(venv_python), [str(venv_python)] + sys.argv)
+        os.execv(str(venv_python), [str(venv_python)] + sys.argv)  # nosec B606
     except Exception as e:
         print(f"\n\033[91mКритическая ошибка при попытке перезапуска: {e}\033[0m")
         sys.exit(1)
 
-import webview
-import shutil
-from huggingface_hub import HfFolder, whoami, hf_hub_url
-from huggingface_hub.utils import HfHubHTTPError
-from huggingface_hub.errors import RepositoryNotFoundError, EntryNotFoundError
-import requests
-from requests.exceptions import HTTPError
-import json
-import logging
-import threading
-import time
-import math
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -48,8 +56,6 @@ app_dir = project_root / "app"
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(app_dir))
 
-from app.main import app
-from webview.errors import JavascriptException
 
 # Определяем пути к файлам данных
 DATA_DIR = project_root / "plotix_data"
@@ -289,7 +295,7 @@ class Api:
                 model_url = f"https://huggingface.co/{repo_id}"
                 message = f'Для доступа к этой модели необходимо принять ее условия. Пожалуйста, перейдите на <a href="{model_url}" target="_blank" rel="noopener noreferrer">страницу модели</a>, войдите в аккаунт и примите лицензионное соглашение. После этого попробуйте скачать снова.'
             elif status_code == 401:
-                message = f"Ошибка 401: Неверный токен. Попробуйте снова войти в Hugging Face через настройки приложения."
+                message = "Ошибка 401: Неверный токен. Попробуйте снова войти в Hugging Face через настройки приложения."
             elif status_code == 404:
                 message = f"Ошибка 404: Файл '{filename}' не найден в репозитории '{repo_id}'."
             else:
@@ -338,14 +344,15 @@ class Api:
         return {"status": "started"}
 
     def cancel_download(self, repo_id: str, filename: str):
-        # ... (этот метод без изменений)
         task_id = f"{repo_id}/{filename}"
         with self._tasks_lock:
-            task = self._download_tasks.get(task_id)
-            if task and isinstance(task.get("cancel_flag"), threading.Event):
-                task["cancel_flag"].set()
-                return {"status": "ok"}
-        return {"status": "error"}
+            task_info = self._download_tasks.get(task_id)
+            if task_info:
+                cancel_event = task_info.get("cancel_flag")
+                if isinstance(cancel_event, threading.Event):
+                    cancel_event.set()
+                    return {"status": "ok"}
+        return {"status": "error", "message": "Task not found or invalid."}
 
     def save_chats_to_disk(self, chats_data: dict) -> dict:
         """Сохраняет объект чатов в файл chats.json."""
@@ -408,7 +415,7 @@ if __name__ == "__main__":
 
     window = webview.create_window(
         "AI Quest Generator",
-        app,
+        app,  # type: ignore
         js_api=api,
         width=1280,
         height=800,

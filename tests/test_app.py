@@ -14,7 +14,6 @@ def test_index_route(client):
     """Тестирует, что главная страница загружается успешно."""
     response = client.get("/")
     assert response.status_code == 200
-    # Эта строка корректна, так как "QuestGenerator AI" содержит только ASCII
     assert b"QuestGenerator AI" in response.data
 
 
@@ -160,3 +159,75 @@ def test_get_available_models_endpoint_missing_data(client):
     response = client.post("/api/models", json={"api_provider": "groq"})
     assert response.status_code == 400
     assert "Missing 'api_key' or 'api_provider'" in response.get_json().get("error", "")
+
+
+def test_get_local_models_endpoint_success(client, monkeypatch):
+    """Тестирует успешное получение локальных моделей."""
+    mock_models = {"models": [{"name": "local.gguf", "size": 123}]}
+    monkeypatch.setattr(
+        "app.main.get_available_models",
+        lambda api_provider, api_key: mock_models,
+    )
+    response = client.get("/api/local_models")
+    assert response.status_code == 200
+    assert response.get_json() == mock_models
+
+
+def test_get_local_models_endpoint_error(client, monkeypatch):
+    """Тестирует ошибку при получении локальных моделей."""
+    monkeypatch.setattr(
+        "app.main.get_available_models",
+        lambda api_provider, api_key: {"error": "directory not found"},
+    )
+    response = client.get("/api/local_models")
+    assert response.status_code == 500
+    assert response.get_json() == {"error": "directory not found"}
+
+
+def test_delete_local_models_endpoint_success(client, monkeypatch):
+    """Тестирует успешное удаление файлов."""
+    monkeypatch.setattr(
+        "app.main.delete_local_models",
+        lambda filenames: {"status": "ok", "message": "Success"},
+    )
+    response = client.post(
+        "/api/local_models/delete", json={"filenames": ["model1.gguf"]}
+    )
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ok", "message": "Success"}
+
+
+def test_delete_local_models_endpoint_bad_request(client):
+    """Тестирует некорректный запрос на удаление."""
+    response = client.post("/api/local_models/delete", json={"files": ["model1.gguf"]})
+    assert response.status_code == 400
+    assert "Требуется 'filenames' в виде списка." in response.get_json()["error"]
+
+    response = client.post("/api/local_models/delete", json={"filenames": "not-a-list"})
+    assert response.status_code == 400
+
+
+def test_delete_local_models_endpoint_server_error(client, monkeypatch):
+    """Тестирует ошибку 500 при удалении."""
+    monkeypatch.setattr(
+        "app.main.delete_local_models",
+        lambda filenames: {"status": "error", "message": "Failure"},
+    )
+    response = client.post(
+        "/api/local_models/delete", json={"filenames": ["model1.gguf"]}
+    )
+    assert response.status_code == 500
+    assert response.get_json() == {"status": "error", "message": "Failure"}
+
+
+def test_delete_local_models_endpoint_partial_success(client, monkeypatch):
+    """Тестирует частичный успех (статус 207)."""
+    monkeypatch.setattr(
+        "app.main.delete_local_models",
+        lambda filenames: {"status": "partial", "message": "Partial success"},
+    )
+    response = client.post(
+        "/api/local_models/delete", json={"filenames": ["model1.gguf"]}
+    )
+    assert response.status_code == 207
+    assert response.get_json() == {"status": "partial", "message": "Partial success"}

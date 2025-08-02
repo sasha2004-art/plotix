@@ -1,18 +1,19 @@
-import os
 import logging
-from flask import Flask, request, jsonify, render_template
+import os
+
 from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, request
 
-# Загружаем переменные из .env файла
-load_dotenv()
 
-from .services.quest_generator import (  # noqa: E402
-    create_quest_from_setting,
-    validate_api_key,
-    get_available_models,
-    delete_local_models,
-)
 from .models.recommended_models import RECOMMENDED_MODELS
+from .services.quest_generator import (
+    create_quest_from_setting,
+    delete_local_models,
+    get_available_models,
+    validate_api_key,
+)
+
+load_dotenv()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -95,7 +96,7 @@ def available_models_endpoint():
     api_key = data["api_key"]
     api_provider = data["api_provider"]
 
-    if not api_key:
+    if not api_key and api_provider != "local":
         return jsonify({"error": "API ключ не может быть пустым."})
 
     models = get_available_models(api_provider=api_provider, api_key=api_key)
@@ -133,5 +134,7 @@ def delete_local_models_endpoint():
     status_code = 200
     if result.get("status") == "error":
         status_code = 500
+    elif result.get("status") == "partial":
+        status_code = 207  # Multi-Status
 
     return jsonify(result), status_code

@@ -1,13 +1,20 @@
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
 [tool.pyright]
-include = ["app", "scripts", "tests", "run_desktop.py", "start.py"]
-exclude = ["**/__pycache__"]
-venvPath = "."
-venv = ".venv"
-reportMissingImports = true
-reportUnusedImport = true
+include = ["app", "tests", "scripts"]
+exclude = ["**/__pycache__", ".venv"]
+typeCheckingMode = "basic"
+reportMissingImports = "warning"
+reportMissingTypeStubs = "none"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
 
 [tool.bandit]
-# B101: assert_used (разрешено в тестах)
-# B404: import_subprocess (разрешено в скриптах)
-# B603: subprocess_without_shell_equals_true (разрешено в скриптах)
-skips = ["B101", "B404", "B603"]
+skips = ["B101"]

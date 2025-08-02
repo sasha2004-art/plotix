@@ -1,8 +1,8 @@
+import os
+import subprocess  # nosec B404
 import sys
-import subprocess
 import venv
 from pathlib import Path
-import os
 
 
 class Colors:
@@ -20,7 +20,7 @@ def run_command_live(command, env=None):
     """
     try:
         # subprocess.run с check=True будет стримить вывод и выбросит исключение при ошибке
-        subprocess.run(command, check=True, env=env)
+        subprocess.run(command, check=True, env=env)  # nosec B603
         return True
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(
