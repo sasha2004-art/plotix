@@ -6,6 +6,7 @@
     <title>Настройки</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
+        /* Стили остаются без изменений */
         .key-group { display: flex; align-items: center; gap: 10px; }
         .key-group input { flex-grow: 1; }
         .key-group button { width: 120px; font-size: 14px; padding: 10px; }
@@ -187,7 +188,6 @@
         .hf-auth-container { display: flex; justify-content: space-between; align-items: center; }
         #hf-login-btn { width: 120px; font-size: 14px; padding: 8px; }
 
-        /* ИЗМЕНЕНИЕ: Стили для тела нового модального окна */
         #interactive-error-modal-body {
             font-size: 15px !important;
         }
@@ -197,7 +197,7 @@
     </style>
 </head>
 <body>
-    <!-- ИЗМЕНЕНИЕ: HTML для нового интерактивного модального окна -->
+    <!-- HTML-структура остается без изменений -->
     <div id="interactive-error-modal" class="modal-overlay">
         <div class="modal-content">
             <h2 id="interactive-error-modal-title">Ошибка</h2>
@@ -229,6 +229,7 @@
     </div>
 
     <script id="global-event-handler">
+        // Этот обработчик остается без изменений
         function getActiveDownloads() { return JSON.parse(localStorage.getItem('activeDownloads')) || {}; }
         function setActiveDownloads(downloads) { localStorage.setItem('activeDownloads', JSON.stringify(downloads)); }
         window.startDownload = (repoId, filename) => {
@@ -296,6 +297,7 @@
             </div>
             
             {% if use_local_llm %}
+            <!-- Блок local llm без изменений -->
             <div class="collapsible-container">
                 <div class="collapsible-header" data-target="local-llm-master-content">
                     <div class="result-box-title">Управление локальными LLM</div>
@@ -388,14 +390,16 @@
         </div>
     </div>
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // --- Логика для сворачиваемых блоков ---
+    // ==================== ИЗМЕНЕНИЕ: Вся логика теперь внутри pywebviewready ====================
+    window.addEventListener('pywebviewready', () => {
+        const api = window.pywebview.api;
+        
+        // --- Логика для сворачиваемых блоков (без изменений) ---
         const upArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>`;
         const downArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>`;
         document.querySelectorAll('.collapsible-header').forEach(header => {
             const content = document.getElementById(header.dataset.target);
             const toggleBtn = header.querySelector('.toggle-btn');
-            
             if (!content || !toggleBtn) return;
             let isVisible = content.style.display === 'block';
             toggleBtn.innerHTML = isVisible ? upArrow : downArrow;
@@ -413,22 +417,7 @@
             if (firstToggleBtn) firstToggleBtn.innerHTML = upArrow;
         }
 
-        // --- ИЗМЕНЕНИЕ: Логика для нового модального окна ошибки ---
-        const errorModal = document.getElementById('interactive-error-modal');
-        const errorModalTitle = document.getElementById('interactive-error-modal-title');
-        const errorModalBody = document.getElementById('interactive-error-modal-body');
-        const errorModalCloseBtn = document.getElementById('interactive-error-modal-close-btn');
-
-        function showInteractiveError(title, htmlContent) {
-            errorModalTitle.textContent = title;
-            errorModalBody.innerHTML = htmlContent;
-            errorModal.style.display = 'flex';
-        }
-
-        errorModalCloseBtn.addEventListener('click', () => {
-            errorModal.style.display = 'none';
-        });
-
+        // --- Управление темой (без изменений) ---
         const themeSelect = document.getElementById('theme-select');
         function applyTheme(theme) {
             if (theme === 'system') {
@@ -442,9 +431,27 @@
             themeSelect.value = savedTheme;
             applyTheme(savedTheme);
             themeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
-        } else {
-            const savedTheme = localStorage.getItem('theme') || 'system';
-            applyTheme(savedTheme);
+        }
+
+        // --- Логика для API ключей ---
+        const providers = ['groq', 'openai', 'gemini'];
+        
+        async function loadAndPopulateKeys() {
+            try {
+                const savedKeys = await api.load_api_keys();
+                if (savedKeys) {
+                    providers.forEach(provider => {
+                        const input = document.getElementById(`${provider}-api-key-input`);
+                        if (input && savedKeys[provider]) {
+                            input.value = savedKeys[provider];
+                            // Также обновляем localStorage для совместимости с главной страницей
+                            localStorage.setItem(`${provider}_api_key`, savedKeys[provider]);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to load API keys:", e);
+            }
         }
         
         async function checkKey(provider) {
@@ -478,22 +485,33 @@
                 statusEl.classList.add('status-error');
             }
         }
-        document.getElementById('save-keys-btn').addEventListener('click', () => {
-            const groqApiKey = document.getElementById('groq-api-key-input').value;
-            const openaiApiKey = document.getElementById('openai-api-key-input').value;
-            const geminiApiKey = document.getElementById('gemini-api-key-input').value;
-            if (groqApiKey) localStorage.setItem('groq_api_key', groqApiKey);
-            if (openaiApiKey) localStorage.setItem('openai_api_key', openaiApiKey);
-            if (geminiApiKey) localStorage.setItem('gemini_api_key', geminiApiKey);
-            alert('Ключи сохранены в локальном хранилище!');
+        
+        document.getElementById('save-keys-btn').addEventListener('click', async () => {
+            const keysToSave = {};
+            providers.forEach(provider => {
+                const key = document.getElementById(`${provider}-api-key-input`).value.trim();
+                if (key) {
+                    keysToSave[provider] = key;
+                    localStorage.setItem(`${provider}_api_key`, key);
+                } else {
+                    localStorage.removeItem(`${provider}_api_key`);
+                }
+            });
+            try {
+                await api.save_api_keys(keysToSave);
+                alert('Ключи сохранены!');
+            } catch(e) {
+                alert('Не удалось сохранить ключи. См. консоль.');
+                console.error("Failed to save keys via Python API:", e);
+            }
         });
-        document.getElementById('groq-api-key-input').value = localStorage.getItem('groq_api_key') || '';
-        document.getElementById('openai-api-key-input').value = localStorage.getItem('openai_api_key') || '';
-        document.getElementById('gemini-api-key-input').value = localStorage.getItem('gemini_api_key') || '';
+
         document.querySelectorAll('.check-key-btn').forEach(button => {
             button.addEventListener('click', () => checkKey(button.dataset.provider));
         });
 
+        // --- Логика для локальных моделей (без изменений, т.к. она уже использует fetch) ---
+        // ... (весь js-код для Hugging Face, загрузки, удаления и скачивания моделей остается здесь)
         {% if use_local_llm %}
         const hfLoginBtn = document.getElementById('hf-login-btn');
         const hfStatusText = document.getElementById('hf-status-text');
@@ -505,7 +523,7 @@
 
         async function updateHfStatus() {
             try {
-                const result = await window.pywebview.api.get_hf_status();
+                const result = await api.get_hf_status();
                 if (result.logged_in) {
                     hfStatusText.innerHTML = `Вы вошли как: <strong>${result.username}</strong>`;
                     hfLoginBtn.textContent = 'Выйти';
@@ -525,7 +543,7 @@
         hfLoginBtn.addEventListener('click', async () => {
             if (hfLoginBtn.textContent === 'Выйти') {
                 if (confirm('Вы уверены, что хотите выйти? Токен будет удален.')) {
-                    await window.pywebview.api.save_hf_token('');
+                    await api.save_hf_token('');
                     updateHfStatus();
                 }
             } else {
@@ -546,7 +564,7 @@
             hfSaveBtn.textContent = 'Проверка...';
             hfModalStatus.textContent = '';
             try {
-                const result = await window.pywebview.api.save_hf_token(token);
+                const result = await api.save_hf_token(token);
                 if (result.status === 'ok') {
                     hfModal.style.display = 'none';
                     updateHfStatus();
@@ -571,8 +589,7 @@
         let selectedFilePaths = [];
         customBtn.addEventListener('click', async () => {
             try {
-                if (!window.pywebview || !window.pywebview.api) { alert("Функция доступна только в десктопном приложении."); return; }
-                const result = await window.pywebview.api.open_file_dialog();
+                const result = await api.open_file_dialog();
                 selectedFilePaths = result || [];
                 operationStatus.style.display = 'none';
                 if (selectedFilePaths.length > 0) {
@@ -596,7 +613,7 @@
             operationStatus.className = "";
             operationStatus.style.display = 'block';
             try {
-                const result = await window.pywebview.api.manage_files(action, selectedFilePaths);
+                const result = await api.manage_files(action, selectedFilePaths);
                 operationStatus.textContent = result.message;
                 operationStatus.classList.add(result.status === 'ok' ? 'status-ok' : 'status-error');
                 if (result.status === 'ok') {
@@ -808,7 +825,7 @@
                 if (activeDownloads[taskId]) {
                     renderProgressBar(actionsContainer, activeDownloads[taskId]);
                 } else if (installedModels.includes(model.filename)) {
-                    renderDeleteButton(actionsContainer, model.filename);
+                    renderDeleteButton(actionsContainer, filename);
                 } else {
                     renderDownloadButton(actionsContainer, model.repo_id, model.filename);
                 }
@@ -858,7 +875,6 @@
             }
 
             if (status !== 'cancelled') {
-                // ИЗМЕНЕНИЕ: Проверяем, содержит ли сообщение HTML для выбора типа уведомления
                 if (message.includes('<a href')) {
                     const title = status === 'ok' ? 'Успех' : 'Требуется действие';
                     showInteractiveError(title, message);
@@ -880,7 +896,7 @@
             if (target.classList.contains('download-btn')) {
                 const button = target;
                 const { repoId, filename } = button.dataset;
-                const result = await window.pywebview.api.download_model(repoId, filename);
+                const result = await api.download_model(repoId, filename);
                 if (result && result.status === 'error') {
                     alert(result.message); 
                 }
@@ -889,7 +905,7 @@
                 const { repoId, filename } = button.dataset;
                 button.textContent = '...';
                 button.disabled = true;
-                await window.pywebview.api.cancel_download(repoId, filename);
+                await api.cancel_download(repoId, filename);
             } 
             else if (target.classList.contains('delete-btn-card')) {
                 const button = target;
@@ -925,6 +941,8 @@
             }
         });
         
+        // --- Инициализация при загрузке страницы ---
+        loadAndPopulateKeys(); // Загружаем ключи
         updateHfStatus();
         loadInstalledModels();
         fetchRecommendedModels();
