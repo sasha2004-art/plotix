@@ -57,13 +57,10 @@ window.addEventListener('pywebviewready', async () => {
         }
     }
 
-    // ==================== ИЗМЕНЕНИЕ: Новая функция для синхронизации ключей ====================
     async function syncApiKeysFromFileToLocalStorage() {
         try {
             const savedKeys = await api.load_api_keys();
             if (savedKeys) {
-                // Записываем загруженные из файла ключи в localStorage,
-                // чтобы остальная часть приложения могла их использовать.
                 localStorage.setItem('groq_api_key', savedKeys.groq || '');
                 localStorage.setItem('openai_api_key', savedKeys.openai || '');
                 localStorage.setItem('gemini_api_key', savedKeys.gemini || '');
@@ -73,7 +70,6 @@ window.addEventListener('pywebviewready', async () => {
             console.error("Could not sync API keys from file:", e);
         }
     }
-    // =========================================================================================
 
     // ==================== ОСТАЛЬНАЯ ЛОГИКА ПРИЛОЖЕНИЯ ====================
 
@@ -124,7 +120,11 @@ window.addEventListener('pywebviewready', async () => {
             });
 
             const deleteBtn = document.createElement('button');
-            deleteBtn.innerHTML = '';
+            // ==================== ИЗМЕНЕНИЕ: Иконка заменена на SVG ====================
+            // Эта SVG-иконка будет автоматически окрашена в красный цвет благодаря CSS-классу '.delete-btn'
+            const deleteIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
+            deleteBtn.innerHTML = deleteIconSVG;
+            // =========================================================================
             deleteBtn.classList.add('delete-btn');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -212,7 +212,6 @@ window.addEventListener('pywebviewready', async () => {
             return;
         }
 
-        // Эта функция теперь будет работать корректно, т.к. localStorage уже заполнен
         const apiKey = localStorage.getItem(`${selectedProvider}_api_key`);
         if (!apiKey) return;
 
@@ -363,13 +362,9 @@ window.addEventListener('pywebviewready', async () => {
     }
     
     // ==================== ГЛАВНЫЙ ЗАПУСК ====================
-    // Сначала синхронизируем ключи из файла в localStorage
     await syncApiKeysFromFileToLocalStorage();
-    
-    // Затем загружаем чаты
     await loadChats();
     
-    // После этого инициализируем UI на основе загруженных данных
     if (window.activeChatId && window.chats[window.activeChatId]) {
         switchChat(window.activeChatId);
     } else if (Object.keys(window.chats).length > 0) {
@@ -380,11 +375,10 @@ window.addEventListener('pywebviewready', async () => {
     }
     
     renderChatList();
-    updateModels(); // Теперь эта функция найдет ключи в localStorage
+    updateModels();
     toggleResultView(true);
 });
 
-// Глобальные обработчики
 window.addEventListener('download-finished', (e) => {
     const { status, message } = e.detail;
     if (status !== 'cancelled') {
