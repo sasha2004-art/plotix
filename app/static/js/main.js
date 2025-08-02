@@ -77,120 +77,106 @@ window.addEventListener('pywebviewready', async () => {
     // ==================== ЛОГИКА ГРАФА И РЕНДЕРИНГА ====================
     
     async function renderQuestGraph(jsonString) {
-        graphBox.innerHTML = 'Загрузка графа...';
+    graphBox.innerHTML = 'Подготовка графа...';
+
+    // Даем браузеру ничтожную паузу, чтобы он успел обработать
+    // переключение вкладок и подготовить контейнер.
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    try {
+        let questData;
         try {
-            let questData;
-            // НАДЕЖНЫЙ ПАРСИНГ: Пробуем распарсить строку. Если результат - тоже строка,
-            // значит, JSON был "завернут" в еще одну строку, и мы парсим его снова.
-            try {
-                const intermediateParse = JSON.parse(jsonString);
-                if (typeof intermediateParse === 'string') {
-                    questData = JSON.parse(intermediateParse);
-                } else {
-                    questData = intermediateParse;
-                }
-            } catch (e) {
-                 // Если парсинг не удался, выбрасываем ошибку, которая будет поймана ниже.
-                throw new Error("Invalid JSON format");
-            }
-
-
-            if (!questData || !questData.scenes || !questData.start_scene) {
-                throw new Error("Неверная структура JSON для графа.");
-            }
-            
-            const sceneDataMap = new Map();
-            const definedIds = new Set();
-            questData.scenes.forEach(scene => {
-                if (scene && scene.scene_id) {
-                    // Обработка дубликатов: сохраняем только первую уникальную сцену
-                    if (!definedIds.has(scene.scene_id)) {
-                        sceneDataMap.set(scene.scene_id, scene);
-                        definedIds.add(scene.scene_id);
-                    }
-                }
-            });
-            
-            const allSceneIds = new Set(definedIds);
-            sceneDataMap.forEach(scene => {
-                if (scene.choices && Array.isArray(scene.choices)) {
-                    scene.choices.forEach(choice => {
-                        if (choice && choice.next_scene) {
-                            allSceneIds.add(choice.next_scene);
-                        }
-                    });
-                }
-            });
-
-            const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
-            const themeVariables = {
-                fontSize: '18px',
-                primaryColor: isDarkTheme ? '#28252b' : '#ffffff',
-                primaryTextColor: isDarkTheme ? '#ffffff' : '#000000',
-                primaryBorderColor: isDarkTheme ? '#bfb8dd' : '#555555',
-                lineColor: isDarkTheme ? '#bfb8dd' : '#555555',
-                secondaryColor: '#715cd7', 
-                secondaryTextColor: '#ffffff',
-                strokeWidth: '2px',
-            };
-            
-            const escapeQuotes = (text) => text ? text.replace(/"/g, '#quot;') : '';
-            const truncate = (text, length) => (text && text.length > length) ? text.substring(0, length) + '...' : text;
-            
-            let mermaidDefinition = `%%{init: {'theme': 'base', 'themeVariables': ${JSON.stringify(themeVariables)}}}%%\n`;
-            mermaidDefinition += 'graph TD\n';
-
-            for (const sceneId of allSceneIds) {
-                 mermaidDefinition += `    ${sceneId}["${sceneId}"]\n`;
-            }
-            
-            sceneDataMap.forEach(scene => {
-                if (scene.choices) {
-                    scene.choices.forEach(choice => {
-                        if (choice && choice.next_scene) {
-                            const truncatedChoice = escapeQuotes(truncate(choice.text, 30));
-                            mermaidDefinition += `    ${scene.scene_id} -->|"${truncatedChoice}"| ${choice.next_scene}\n`;
-                        }
-                    });
-                }
-            });
-
-            mermaidDefinition += `    style ${questData.start_scene} fill:${themeVariables.secondaryColor},stroke:${themeVariables.secondaryColor},color:${themeVariables.secondaryTextColor},font-weight:bold\n`;
-            
-            graphBox.innerHTML = mermaidDefinition;
-            graphBox.removeAttribute('data-processed');
-            
-            await mermaid.run({ nodes: [graphBox] });
-            
-            const svgNodes = graphBox.querySelectorAll('.node');
-            svgNodes.forEach(svgNode => {
-                const sceneId = svgNode.id.replace(/flowchart-(.*)-\d+/, '$1');
-                
-                svgNode.addEventListener('mousemove', (e) => {
-                    tooltip.style.left = `${e.clientX + 15}px`;
-                    tooltip.style.top = `${e.clientY + 15}px`;
-                });
-
-                svgNode.addEventListener('mouseover', (e) => {
-                    if (sceneDataMap.has(sceneId)) {
-                        const sceneData = sceneDataMap.get(sceneId);
-                        tooltip.innerHTML = `<strong>${sceneData.scene_id}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>${sceneData.text}</p>`;
-                    } else {
-                        tooltip.innerHTML = `<strong>${sceneId}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>Конец ветки.</p>`;
-                    }
-                    tooltip.style.display = 'block';
-                });
-
-                svgNode.addEventListener('mouseout', () => {
-                    tooltip.style.display = 'none';
-                });
-            });
-
-        } catch (error) {
-            console.error("Ошибка рендеринга графа:", error);
-            graphBox.innerHTML = '<p class="status-error">Не удалось построить граф. Проверьте валидность и структуру JSON.</p>';
+            const intermediateParse = JSON.parse(jsonString);
+            questData = (typeof intermediateParse === 'string') ? JSON.parse(intermediateParse) : intermediateParse;
+        } catch (e) {
+            throw new Error("Invalid JSON format");
         }
+
+        if (!questData || !questData.scenes || !questData.start_scene) {
+            throw new Error("Неверная структура JSON для графа.");
+        }
+
+        const sceneDataMap = new Map(questData.scenes.map(scene => [scene.scene_id, scene]));
+        const allSceneIds = new Set(questData.scenes.map(s => s.scene_id));
+        questData.scenes.forEach(scene => {
+            scene.choices?.forEach(choice => {
+                if (choice && choice.next_scene) allSceneIds.add(choice.next_scene)
+            });
+        });
+
+        const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+        const themeVariables = {
+            fontSize: '22px',
+            primaryColor: isDarkTheme ? '#28252b' : '#ffffff',
+            primaryTextColor: isDarkTheme ? '#ffffff' : '#000000',
+            primaryBorderColor: isDarkTheme ? '#bfb8dd' : '#555555',
+            lineColor: isDarkTheme ? '#bfb8dd' : '#555555',
+            secondaryColor: '#715cd7',
+            secondaryTextColor: '#ffffff',
+            strokeWidth: '2px',
+        };
+
+        const formatEdgeLabel = (text, lineLength = 25) => {
+            if (!text) return ' ';
+            const escapedText = text.replace(/"/g, '#quot;');
+            const words = escapedText.split(' ');
+            const lines = [];
+            let currentLine = "";
+            for (const word of words) {
+                if (currentLine === "") currentLine = word;
+                else if (currentLine.length + 1 + word.length <= lineLength) currentLine += " " + word;
+                else { lines.push(currentLine); currentLine = word; }
+            }
+            if (currentLine) lines.push(currentLine);
+            return lines.join('<br>');
+        };
+
+        let mermaidDefinition = `%%{init: {'theme': 'base', 'themeVariables': ${JSON.stringify(themeVariables)}}}%%\n`;
+        mermaidDefinition += 'graph TD\n';
+
+        allSceneIds.forEach(id => mermaidDefinition += `    ${id}["${id}"]\n`);
+        
+        sceneDataMap.forEach(scene => {
+            scene.choices?.forEach(choice => {
+                if (choice && choice.next_scene) {
+                    const formattedLabel = formatEdgeLabel(choice.text);
+                    mermaidDefinition += `    ${scene.scene_id} -->|"${formattedLabel}"| ${choice.next_scene}\n`;
+                }
+            });
+        });
+
+        mermaidDefinition += `    style ${questData.start_scene} fill:${themeVariables.secondaryColor},stroke:${themeVariables.secondaryColor},color:${themeVariables.secondaryTextColor},font-weight:bold\n`;
+        
+        graphBox.innerHTML = mermaidDefinition;
+        graphBox.removeAttribute('data-processed');
+
+        await mermaid.run({ nodes: [graphBox] });
+
+        // Привязка подсказок
+        const svgNodes = graphBox.querySelectorAll('.node');
+        svgNodes.forEach(svgNode => {
+            const sceneId = svgNode.id.replace(/flowchart-(.*)-\d+/, '$1');
+            svgNode.addEventListener('mousemove', (e) => {
+                tooltip.style.left = `${e.clientX + 15}px`;
+                tooltip.style.top = `${e.clientY + 15}px`;
+            });
+            svgNode.addEventListener('mouseover', () => {
+                const sceneData = sceneDataMap.get(sceneId);
+                tooltip.innerHTML = sceneData
+                    ? `<strong>${sceneData.scene_id}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>${sceneData.text}</p>`
+                    : `<strong>${sceneId}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>Конец ветки.</p>`;
+                tooltip.style.display = 'block';
+            });
+            svgNode.addEventListener('mouseout', () => {
+                tooltip.style.display = 'none';
+            });
+        });
+
+    } catch (error) {
+        console.error("Ошибка рендеринга графа:", error);
+        graphBox.innerHTML = `<p class="status-error">Не удалось построить граф. Проверьте валидность и структуру JSON.</p>`;
     }
+}
 
 
     // ==================== ОСТАЛЬНАЯ ЛОГИКА ПРИЛОЖЕНИЯ ====================
@@ -416,19 +402,32 @@ window.addEventListener('pywebviewready', async () => {
 
     providerRadios.forEach(radio => radio.addEventListener('change', updateModels));
     
-    graphTab.addEventListener('click', () => {
-        graphTab.classList.add('active');
-        jsonTab.classList.remove('active');
-        graphBox.style.display = 'block';
-        resultBoxWrapper.style.display = 'none';
-    });
+    function showTab(tabName) {
+        if (tabName === 'graph') {
+            graphTab.classList.add('active');
+            jsonTab.classList.remove('active');
+            graphBox.style.display = 'block';
+            resultBoxWrapper.style.display = 'none';
 
-    jsonTab.addEventListener('click', () => {
-        jsonTab.classList.add('active');
-        graphTab.classList.remove('active');
-        graphBox.style.display = 'none';
-        resultBoxWrapper.style.display = 'block';
-    });
+            // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: ПОВТОРНАЯ ОТРИСОВКА
+            // Если в чате есть валидный результат, перерисовываем граф.
+            // Это исправляет его размеры, если он был создан в невидимом контейнере.
+            const currentResult = window.activeChatId && window.chats[window.activeChatId]?.result;
+            if (currentResult && !currentResult.includes('Здесь появится')) {
+                console.log("Re-rendering graph on tab click to fix dimensions.");
+                renderQuestGraph(currentResult);
+            }
+        } else { // 'json'
+            jsonTab.classList.add('active');
+            graphTab.classList.remove('active');
+            graphBox.style.display = 'none';
+            resultBoxWrapper.style.display = 'block';
+        }
+    }
+
+    graphTab.addEventListener('click', () => showTab('graph'));
+    jsonTab.addEventListener('click', () => showTab('json'));
+
 
 
     downloadResultBtn.addEventListener('click', async () => {
@@ -458,7 +457,7 @@ window.addEventListener('pywebviewready', async () => {
         generateBtn.disabled = true;
         window.chats[window.activeChatId].setting = setting;
         
-        graphTab.click();
+        showTab('graph');
 
         try {
             const response = await fetch('/generate', {

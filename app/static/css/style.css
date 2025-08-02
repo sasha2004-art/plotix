@@ -540,42 +540,30 @@ pre {
     font-weight: bold;
 }
 
-#graph-box {
-    padding: 15px;
-    background-color: var(--bg-sidebar);
-    border-radius: 0 0 4px 4px; /* Only bottom corners are rounded */
-    min-height: 200px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow-x: auto;
-    color: var(--text-muted);
-}
 
-#graph-box svg {
-    max-width: none !important; /* Override mermaid's inline style to allow scrolling */
-}
+
 
 /* Стили для Mermaid.js, чтобы соответствовать теме */
+
+
 #graph-box {
     padding: 20px;
     background-color: var(--bg-sidebar);
     border-radius: 0 0 4px 4px;
-    /* Убираем min-height и display:flex, чтобы контейнер рос естественно */
-    overflow: auto; /* Оставляем скролл для очень широких графов */
+    overflow: auto;
     color: var(--text-muted);
 }
 
 #graph-box .status-error {
     color: var(--accent-failed);
-    align-self: center; /* Центрируем текст ошибки, если он есть */
-    margin: auto;
+    text-align: center;
+    padding: 40px 20px;
 }
 
-
 #graph-box svg {
-    max-width: none !important; /* Очень важно: позволяет SVG быть больше контейнера */
-    height: auto;
+    max-width: none !important;
+    height: auto !important;
+    display: block;
 }
 
 /* --- Стили для всплывающей подсказки графа --- */
@@ -594,4 +582,23 @@ pre {
     line-height: 1.5;
     color: var(--text-primary);
     white-space: pre-wrap; /* Сохраняет переносы строк из текста */
+}
+
+
+#graph-box .node rect {
+    min-width: 150px !important;
+    min-height: 50px !important;
+}
+
+#graph-box .nodeLabel {
+    font-weight: bold !important;
+    text-align: center !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+#graph-box .edgeLabel {
+    font-size: 22px !important;
 }

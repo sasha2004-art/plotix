@@ -12,9 +12,13 @@ if sys.prefix == sys.base_prefix:
         venv_python = venv_dir / "bin" / "python"
     if not venv_python.exists():
         print("\n\033[91mОшибка: Виртуальное окружение не найдено!\033[0m")
-        print(f"\033[93mПожалуйста, запустите 'python {project_root / 'start.py'}' для первоначальной настройки.\033[0m")
+        print(
+            f"\033[93mПожалуйста, запустите 'python {project_root / 'start.py'}' для первоначальной настройки.\033[0m"
+        )
         sys.exit(1)
-    print(f"\033[94mНе в виртуальном окружении. Перезапуск с использованием: {venv_python}\033[0m")
+    print(
+        f"\033[94mНе в виртуальном окружении. Перезапуск с использованием: {venv_python}\033[0m"
+    )
     try:
         os.execv(str(venv_python), [str(venv_python)] + sys.argv)
     except Exception as e:
@@ -86,7 +90,7 @@ class Api:
             else:
                 self._window.maximize()
             self._is_maximized = not self._is_maximized
-            
+
     def close(self):
         logger.info("Close requested. Asking JS to prepare for shutdown.")
         if self._window:
@@ -104,7 +108,7 @@ class Api:
         return self._window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=True, file_types=file_types
         )
-    
+
     def get_hf_status(self):
         token = HfFolder.get_token()
         if not token:
@@ -132,7 +136,10 @@ class Api:
             }
         except HfHubHTTPError:
             logger.warning("Invalid Hugging Face token provided.")
-            return {"status": "error", "message": "Неверный токен. Проверьте его и попробуйте снова."}
+            return {
+                "status": "error",
+                "message": "Неверный токен. Проверьте его и попробуйте снова.",
+            }
         except Exception as e:
             logger.error(f"An unexpected error occurred during HF login: {e}")
             return {"status": "error", "message": "Произошла непредвиденная ошибка."}
@@ -237,16 +244,30 @@ class Api:
                             downloaded_size += chunk_len
                             bytes_since_last_update += chunk_len
                             current_time = time.time()
-                            if current_time - last_update_time >= 1.0 or downloaded_size == total_size:
-                                speed = bytes_since_last_update / (current_time - last_update_time) if (current_time - last_update_time) > 0 else 0
-                                percentage = (downloaded_size / total_size * 100) if total_size > 0 else 0
+                            if (
+                                current_time - last_update_time >= 1.0
+                                or downloaded_size == total_size
+                            ):
+                                speed = (
+                                    bytes_since_last_update
+                                    / (current_time - last_update_time)
+                                    if (current_time - last_update_time) > 0
+                                    else 0
+                                )
+                                percentage = (
+                                    (downloaded_size / total_size * 100)
+                                    if total_size > 0
+                                    else 0
+                                )
                                 progress_data = {
                                     "repo_id": repo_id,
                                     "filename": filename,
-                                    "downloaded_str": self._format_bytes(downloaded_size),
+                                    "downloaded_str": self._format_bytes(
+                                        downloaded_size
+                                    ),
                                     "total_str": self._format_bytes(total_size),
                                     "speed_str": f"{self._format_bytes(speed)}/s",
-                                    "percentage": percentage
+                                    "percentage": percentage,
                                 }
                                 js_code = f"window.updateDownloadProgress({json.dumps(progress_data)})"
                                 self._call_js_func(js_code)
@@ -266,9 +287,9 @@ class Api:
             logger.error(f"HTTP error {status_code} for {task_id}: {e}")
             if status_code == 403:
                 model_url = f"https://huggingface.co/{repo_id}"
-                message = (f'Для доступа к этой модели необходимо принять ее условия. Пожалуйста, перейдите на <a href="{model_url}" target="_blank" rel="noopener noreferrer">страницу модели</a>, войдите в аккаунт и примите лицензионное соглашение. После этого попробуйте скачать снова.')
+                message = f'Для доступа к этой модели необходимо принять ее условия. Пожалуйста, перейдите на <a href="{model_url}" target="_blank" rel="noopener noreferrer">страницу модели</a>, войдите в аккаунт и примите лицензионное соглашение. После этого попробуйте скачать снова.'
             elif status_code == 401:
-                message = (f"Ошибка 401: Неверный токен. Попробуйте снова войти в Hugging Face через настройки приложения.")
+                message = f"Ошибка 401: Неверный токен. Попробуйте снова войти в Hugging Face через настройки приложения."
             elif status_code == 404:
                 message = f"Ошибка 404: Файл '{filename}' не найден в репозитории '{repo_id}'."
             else:
@@ -286,7 +307,12 @@ class Api:
                     logger.info(f"Deleted partial file: {local_path}")
                 except OSError as e_del:
                     logger.error(f"Failed to delete partial file {local_path}: {e_del}")
-            finish_data = {"repo_id": repo_id, "filename": filename, "status": status, "message": message}
+            finish_data = {
+                "repo_id": repo_id,
+                "filename": filename,
+                "status": status,
+                "message": message,
+            }
             js_code = f"window.finishDownload({json.dumps(finish_data)})"
             self._call_js_func(js_code)
             self._cleanup_task(task_id)
@@ -296,10 +322,18 @@ class Api:
         task_id = f"{repo_id}/{filename}"
         with self._tasks_lock:
             if task_id in self._download_tasks:
-                return {"status": "error", "message": "Скачивание этой модели уже идет."}
+                return {
+                    "status": "error",
+                    "message": "Скачивание этой модели уже идет.",
+                }
             cancel_flag = threading.Event()
-            thread = threading.Thread(target=self._download_worker, args=(repo_id, filename, cancel_flag))
-            self._download_tasks[task_id] = {"thread": thread, "cancel_flag": cancel_flag}
+            thread = threading.Thread(
+                target=self._download_worker, args=(repo_id, filename, cancel_flag)
+            )
+            self._download_tasks[task_id] = {
+                "thread": thread,
+                "cancel_flag": cancel_flag,
+            }
         thread.start()
         return {"status": "started"}
 
@@ -363,7 +397,9 @@ class Api:
         except (json.JSONDecodeError, OSError) as e:
             logger.error(f"Ошибка загрузки или парсинга api_keys.json: {e}")
             return {}
+
     # ===============================================================================
+
 
 if __name__ == "__main__":
     api = Api()

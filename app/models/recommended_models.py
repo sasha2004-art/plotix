@@ -18,7 +18,7 @@ RECOMMENDED_MODELS = {
             # ИСПРАВЛЕНИЕ: ✅
             "repo_id": "stabilityai/stablelm-2-zephyr-1_6b",
             "filename": "stablelm-2-zephyr-1_6b.gguf",
-            "description": "Официальная GGUF-версия компактной (1.6B параметров), но способной модели. Идеальна для самых слабых систем.", 
+            "description": "Официальная GGUF-версия компактной (1.6B параметров), но способной модели. Идеальна для самых слабых систем.",
             "requirements": "≥ 2GB VRAM или ≥ 8GB RAM (для CPU)",
         },
     ],
