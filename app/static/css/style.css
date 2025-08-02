@@ -35,7 +35,6 @@
     --snackbar-button: #abc7ff;
 }
 
-/* --- Стили для скроллбаров --- */
 ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -516,4 +515,83 @@ pre {
     width: 28px;
     height: 28px;
     fill: currentColor;
+}
+
+/* --- Стили для вкладок результата --- */
+.result-tabs {
+    flex-grow: 1;
+    display: flex;
+}
+
+.tab-link {
+    background: none;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-bottom: 3px solid transparent;
+    font-size: 14px;
+    width: auto; /* Override default button width */
+}
+
+.tab-link.active {
+    color: var(--accent-primary);
+    border-bottom-color: var(--accent-primary);
+    font-weight: bold;
+}
+
+#graph-box {
+    padding: 15px;
+    background-color: var(--bg-sidebar);
+    border-radius: 0 0 4px 4px; /* Only bottom corners are rounded */
+    min-height: 200px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow-x: auto;
+    color: var(--text-muted);
+}
+
+#graph-box svg {
+    max-width: none !important; /* Override mermaid's inline style to allow scrolling */
+}
+
+/* Стили для Mermaid.js, чтобы соответствовать теме */
+#graph-box {
+    padding: 20px;
+    background-color: var(--bg-sidebar);
+    border-radius: 0 0 4px 4px;
+    /* Убираем min-height и display:flex, чтобы контейнер рос естественно */
+    overflow: auto; /* Оставляем скролл для очень широких графов */
+    color: var(--text-muted);
+}
+
+#graph-box .status-error {
+    color: var(--accent-failed);
+    align-self: center; /* Центрируем текст ошибки, если он есть */
+    margin: auto;
+}
+
+
+#graph-box svg {
+    max-width: none !important; /* Очень важно: позволяет SVG быть больше контейнера */
+    height: auto;
+}
+
+/* --- Стили для всплывающей подсказки графа --- */
+.graph-tooltip {
+    display: none;
+    position: absolute;
+    max-width: 400px;
+    padding: 15px;
+    background-color: var(--bg-sidebar-container);
+    border: 1px solid var(--bg-task-card-footer);
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    z-index: 10000;
+    pointer-events: none; /* Подсказка не должна перехватывать события мыши */
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    white-space: pre-wrap; /* Сохраняет переносы строк из текста */
 }

@@ -2,6 +2,7 @@
 window.addEventListener('pywebviewready', async () => {
     // ==================== API И КОНСТАНТЫ ====================
     const api = window.pywebview.api;
+    const tooltip = document.getElementById('graph-tooltip');
     const minimizeBtn = document.getElementById('minimize-btn');
     const maximizeBtn = document.getElementById('maximize-btn');
     const closeBtn = document.getElementById('close-btn');
@@ -14,10 +15,12 @@ window.addEventListener('pywebviewready', async () => {
     const newChatBtn = document.getElementById('new-chat-btn');
     const chatList = document.getElementById('chat-list');
     const settingsBtn = document.getElementById('settings-btn');
-    const toggleResultBtn = document.getElementById('toggle-result-btn');
     const downloadResultBtn = document.getElementById('download-result-btn');
     const themeSelect = document.getElementById('theme-select');
     const resultBoxWrapper = document.getElementById('result-box-wrapper');
+    const graphBox = document.getElementById('graph-box');
+    const jsonTab = document.getElementById('json-tab');
+    const graphTab = document.getElementById('graph-tab');
     const sidebar = document.querySelector('.sidebar');
 
     window.chats = {};
@@ -71,6 +74,125 @@ window.addEventListener('pywebviewready', async () => {
         }
     }
 
+    // ==================== ЛОГИКА ГРАФА И РЕНДЕРИНГА ====================
+    
+    async function renderQuestGraph(jsonString) {
+        graphBox.innerHTML = 'Загрузка графа...';
+        try {
+            let questData;
+            // НАДЕЖНЫЙ ПАРСИНГ: Пробуем распарсить строку. Если результат - тоже строка,
+            // значит, JSON был "завернут" в еще одну строку, и мы парсим его снова.
+            try {
+                const intermediateParse = JSON.parse(jsonString);
+                if (typeof intermediateParse === 'string') {
+                    questData = JSON.parse(intermediateParse);
+                } else {
+                    questData = intermediateParse;
+                }
+            } catch (e) {
+                 // Если парсинг не удался, выбрасываем ошибку, которая будет поймана ниже.
+                throw new Error("Invalid JSON format");
+            }
+
+
+            if (!questData || !questData.scenes || !questData.start_scene) {
+                throw new Error("Неверная структура JSON для графа.");
+            }
+            
+            const sceneDataMap = new Map();
+            const definedIds = new Set();
+            questData.scenes.forEach(scene => {
+                if (scene && scene.scene_id) {
+                    // Обработка дубликатов: сохраняем только первую уникальную сцену
+                    if (!definedIds.has(scene.scene_id)) {
+                        sceneDataMap.set(scene.scene_id, scene);
+                        definedIds.add(scene.scene_id);
+                    }
+                }
+            });
+            
+            const allSceneIds = new Set(definedIds);
+            sceneDataMap.forEach(scene => {
+                if (scene.choices && Array.isArray(scene.choices)) {
+                    scene.choices.forEach(choice => {
+                        if (choice && choice.next_scene) {
+                            allSceneIds.add(choice.next_scene);
+                        }
+                    });
+                }
+            });
+
+            const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+            const themeVariables = {
+                fontSize: '18px',
+                primaryColor: isDarkTheme ? '#28252b' : '#ffffff',
+                primaryTextColor: isDarkTheme ? '#ffffff' : '#000000',
+                primaryBorderColor: isDarkTheme ? '#bfb8dd' : '#555555',
+                lineColor: isDarkTheme ? '#bfb8dd' : '#555555',
+                secondaryColor: '#715cd7', 
+                secondaryTextColor: '#ffffff',
+                strokeWidth: '2px',
+            };
+            
+            const escapeQuotes = (text) => text ? text.replace(/"/g, '#quot;') : '';
+            const truncate = (text, length) => (text && text.length > length) ? text.substring(0, length) + '...' : text;
+            
+            let mermaidDefinition = `%%{init: {'theme': 'base', 'themeVariables': ${JSON.stringify(themeVariables)}}}%%\n`;
+            mermaidDefinition += 'graph TD\n';
+
+            for (const sceneId of allSceneIds) {
+                 mermaidDefinition += `    ${sceneId}["${sceneId}"]\n`;
+            }
+            
+            sceneDataMap.forEach(scene => {
+                if (scene.choices) {
+                    scene.choices.forEach(choice => {
+                        if (choice && choice.next_scene) {
+                            const truncatedChoice = escapeQuotes(truncate(choice.text, 30));
+                            mermaidDefinition += `    ${scene.scene_id} -->|"${truncatedChoice}"| ${choice.next_scene}\n`;
+                        }
+                    });
+                }
+            });
+
+            mermaidDefinition += `    style ${questData.start_scene} fill:${themeVariables.secondaryColor},stroke:${themeVariables.secondaryColor},color:${themeVariables.secondaryTextColor},font-weight:bold\n`;
+            
+            graphBox.innerHTML = mermaidDefinition;
+            graphBox.removeAttribute('data-processed');
+            
+            await mermaid.run({ nodes: [graphBox] });
+            
+            const svgNodes = graphBox.querySelectorAll('.node');
+            svgNodes.forEach(svgNode => {
+                const sceneId = svgNode.id.replace(/flowchart-(.*)-\d+/, '$1');
+                
+                svgNode.addEventListener('mousemove', (e) => {
+                    tooltip.style.left = `${e.clientX + 15}px`;
+                    tooltip.style.top = `${e.clientY + 15}px`;
+                });
+
+                svgNode.addEventListener('mouseover', (e) => {
+                    if (sceneDataMap.has(sceneId)) {
+                        const sceneData = sceneDataMap.get(sceneId);
+                        tooltip.innerHTML = `<strong>${sceneData.scene_id}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>${sceneData.text}</p>`;
+                    } else {
+                        tooltip.innerHTML = `<strong>${sceneId}</strong><hr style="margin: 5px 0; border-color: ${themeVariables.primaryBorderColor};"><p>Конец ветки.</p>`;
+                    }
+                    tooltip.style.display = 'block';
+                });
+
+                svgNode.addEventListener('mouseout', () => {
+                    tooltip.style.display = 'none';
+                });
+            });
+
+        } catch (error) {
+            console.error("Ошибка рендеринга графа:", error);
+            graphBox.innerHTML = '<p class="status-error">Не удалось построить граф. Проверьте валидность и структуру JSON.</p>';
+        }
+    }
+
+
     // ==================== ОСТАЛЬНАЯ ЛОГИКА ПРИЛОЖЕНИЯ ====================
 
     function debouncedSaveChats() {
@@ -79,13 +201,19 @@ window.addEventListener('pywebviewready', async () => {
     }
 
     function applyTheme(theme) {
+        const oldTheme = document.documentElement.getAttribute('data-theme');
+        let newTheme = theme;
+
         if (theme === 'system') {
-            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', systemTheme);
-        } else {
-            document.documentElement.setAttribute('data-theme', theme);
+            newTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         }
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', theme);
+        
+        if (oldTheme !== newTheme && window.activeChatId && window.chats[window.activeChatId]) {
+            renderQuestGraph(window.chats[window.activeChatId].result);
+        }
     }
 
     function renderChatList() {
@@ -120,11 +248,8 @@ window.addEventListener('pywebviewready', async () => {
             });
 
             const deleteBtn = document.createElement('button');
-            // ==================== ИЗМЕНЕНИЕ: Иконка заменена на SVG ====================
-            // Эта SVG-иконка будет автоматически окрашена в красный цвет благодаря CSS-классу '.delete-btn'
             const deleteIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`;
             deleteBtn.innerHTML = deleteIconSVG;
-            // =========================================================================
             deleteBtn.classList.add('delete-btn');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -174,18 +299,21 @@ window.addEventListener('pywebviewready', async () => {
         const chat = window.chats[chatId];
         settingInput.value = chat.setting;
         resultBox.textContent = chat.result;
+        renderQuestGraph(chat.result); 
         renderChatList();
         saveChats();
     }
 
     function createNewChat() {
         const newChatId = `chat_${Date.now()}`;
+        const initialResult = 'Здесь появится сгенерированный JSON...';
         window.chats[newChatId] = {
             id: newChatId,
             title: `Новый чат ${Object.keys(window.chats).length + 1}`,
             setting: '',
-            result: 'Здесь появится сгенерированный JSON...'
+            result: initialResult
         };
+        graphBox.innerHTML = 'Здесь появится граф квеста...';
         renderChatList();
         switchChat(newChatId);
     }
@@ -260,13 +388,6 @@ window.addEventListener('pywebviewready', async () => {
         } catch (error) { console.error('Error fetching models:', error); }
     }
 
-    function toggleResultView(isVisible) {
-        const upArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>`;
-        const downArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>`;
-        resultBoxWrapper.style.display = isVisible ? 'block' : 'none';
-        toggleResultBtn.innerHTML = isVisible ? upArrow : downArrow;
-    }
-
     // ==================== ЗАПУСК ИНИЦИАЛИЗАЦИИ И ПРИВЯЗКА СОБЫТИЙ ====================
 
     if (minimizeBtn) minimizeBtn.addEventListener('click', () => api.minimize());
@@ -294,11 +415,21 @@ window.addEventListener('pywebviewready', async () => {
     });
 
     providerRadios.forEach(radio => radio.addEventListener('change', updateModels));
-
-    toggleResultBtn.addEventListener('click', () => {
-        const isVisible = resultBoxWrapper.style.display !== 'none';
-        toggleResultView(!isVisible);
+    
+    graphTab.addEventListener('click', () => {
+        graphTab.classList.add('active');
+        jsonTab.classList.remove('active');
+        graphBox.style.display = 'block';
+        resultBoxWrapper.style.display = 'none';
     });
+
+    jsonTab.addEventListener('click', () => {
+        jsonTab.classList.add('active');
+        graphTab.classList.remove('active');
+        graphBox.style.display = 'none';
+        resultBoxWrapper.style.display = 'block';
+    });
+
 
     downloadResultBtn.addEventListener('click', async () => {
         try {
@@ -323,8 +454,11 @@ window.addEventListener('pywebviewready', async () => {
         }
 
         resultBox.textContent = 'Генерация... Пожалуйста, подождите.';
+        graphBox.innerHTML = '<p>Генерация... Пожалуйста, подождите.</p>';
         generateBtn.disabled = true;
         window.chats[window.activeChatId].setting = setting;
+        
+        graphTab.click();
 
         try {
             const response = await fetch('/generate', {
@@ -341,10 +475,18 @@ window.addEventListener('pywebviewready', async () => {
             const resultText = response.ok ? JSON.stringify(data, null, 2) : `Ошибка: ${data.error || 'Неизвестная ошибка сервера'}`;
             resultBox.textContent = resultText;
             window.chats[window.activeChatId].result = resultText;
+            
+            if (response.ok) {
+                await renderQuestGraph(resultText);
+            } else {
+                graphBox.innerHTML = `<p class="status-error">${data.error || 'Неизвестная ошибка сервера'}</p>`;
+            }
+
         } catch (error) {
             console.error('Fetch Error:', error);
             const errorMsg = 'Сетевая ошибка или не удалось обработать запрос.';
             resultBox.textContent = errorMsg;
+            graphBox.innerHTML = `<p class="status-error">${errorMsg}</p>`;
             window.chats[window.activeChatId].result = errorMsg;
         } finally {
             generateBtn.disabled = false;
@@ -376,7 +518,7 @@ window.addEventListener('pywebviewready', async () => {
     
     renderChatList();
     updateModels();
-    toggleResultView(true);
+    graphTab.click();
 });
 
 window.addEventListener('download-finished', (e) => {

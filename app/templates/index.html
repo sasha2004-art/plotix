@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Mono:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
 <body>
     <div class="main-layout">
@@ -77,17 +78,22 @@
 
                     <div class="result-container">
                         <div class="result-box-header">
-                            <div class="result-box-title">Результат</div>
+                            <div class="result-tabs">
+                                <button class="tab-link active" id="graph-tab">Граф</button>
+                                <button class="tab-link" id="json-tab">JSON</button>
+                            </div>
                             <div class="result-box-actions">
-                                <button id="toggle-result-btn" class="icon-btn"></button>
-                                <button id="download-result-btn" class="icon-btn">
+                                <button id="download-result-btn" class="icon-btn" title="Сохранить JSON">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
                                         <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13v4h-10v-4H5l7-7 7 7h-2z"/>
                                     </svg>
                                 </button>
                             </div>
                         </div>
-                        <div id="result-box-wrapper">
+                        <div id="graph-box" class="mermaid">
+                            Здесь появится граф квеста...
+                        </div>
+                        <div id="result-box-wrapper" style="display: none;">
                             <pre id="result-box">Здесь появится сгенерированный JSON...</pre>
                         </div>
                     </div>
@@ -95,24 +101,23 @@
             </div>
         </main>
     </div>
-
-    <!-- Порядок не меняем, он уже правильный -->
+    <script>
+        // Инициализируем Mermaid, но отключаем автоматический запуск.
+        // Мы будем запускать его вручную с помощью mermaid.run().
+        mermaid.initialize({ startOnLoad: false });
+    </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     
-    <!-- ==================== ИЗМЕНЕНИЕ: Обработчик стал асинхронным ==================== -->
     <script id="global-event-handler">
-        // Делаем функцию асинхронной, чтобы использовать await
         window.prepareForShutdown = async () => {
             try {
                 if (typeof window.saveChats === "function") {
-                    // Ждем, пока промис сохранения не будет выполнен
                     await window.saveChats();
                     console.log("State save completed before shutdown.");
                 }
             } catch (e) {
                 console.error("Error during pre-shutdown save:", e);
             } finally {
-                // Вызываем финализацию только после завершения сохранения
                 console.log("Notifying Python to finalize shutdown.");
                 if (window.pywebview && window.pywebview.api) {
                     window.pywebview.api.finalize_shutdown();
@@ -120,7 +125,6 @@
             }
         };
 
-        // Функции для управления загрузками (без изменений)
         function getActiveDownloads() { return JSON.parse(localStorage.getItem('activeDownloads')) || {}; }
         function setActiveDownloads(downloads) { localStorage.setItem('activeDownloads', JSON.stringify(downloads)); }
         
@@ -148,6 +152,6 @@
             window.dispatchEvent(new CustomEvent('download-finished', { detail: finishData }));
         };
     </script>
-    <!-- ================================================================================= -->
+    <div id="graph-tooltip" class="graph-tooltip"></div>
 </body>
 </html>
