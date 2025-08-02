@@ -8,6 +8,46 @@ import threading
 import time
 from pathlib import Path
 
+# ==================== БЛОК АВТОМАТИЧЕСКОГО ПЕРЕЗАПУСКА В VENV ====================
+# Этот блок должен быть в самом верху, до остальных импортов проекта.
+# Он проверяет, активен ли venv, и если нет, перезапускает скрипт с правильным
+# интерпретатором Python из папки .venv.
+
+# sys.prefix - текущее окружение. sys.base_prefix - глобальное.
+# Если они совпадают, мы НЕ в виртуальном окружении.
+if sys.prefix == sys.base_prefix:
+    project_root = Path(__file__).parent
+    venv_dir = project_root / ".venv"
+
+    # Определяем путь к исполняемому файлу Python в venv для текущей ОС
+    if sys.platform == "win32":
+        venv_python = venv_dir / "Scripts" / "python.exe"
+    else:
+        venv_python = venv_dir / "bin" / "python"
+
+    # Критически важная проверка: существует ли вообще venv?
+    if not venv_python.exists():
+        # Используем ANSI-коды для цветного вывода
+        print("\n\033[91mОшибка: Виртуальное окружение не найдено!\033[0m")
+        print(
+            f"\033[93mПожалуйста, запустите 'python {project_root / 'start.py'}' для первоначальной настройки.\033[0m"
+        )
+        sys.exit(1)
+
+    # Сообщаем пользователю о перезапуске
+    print(
+        f"\033[94mНе в виртуальном окружении. Перезапуск с использованием: {venv_python}\033[0m"
+    )
+    try:
+        # Перезапускаем скрипт, заменяя текущий процесс.
+        # nosemgrep: python.lang.security.audit.dangerous-exec-os-exec.dangerous-exec-os-exec
+        os.execv(str(venv_python), [str(venv_python)] + sys.argv)  # nosec B606
+    except Exception as e:
+        print(f"\n\033[91mКритическая ошибка при попытке перезапуска: {e}\033[0m")
+        sys.exit(1)
+# ======================== КОНЕЦ БЛОКА ПЕРЕЗАПУСКА ============================
+
+
 # Third-party
 import requests
 import webview
@@ -21,30 +61,6 @@ from requests.exceptions import HTTPError
 from webview.errors import JavascriptException
 
 from app.main import app
-
-# Блок проверки виртуального окружения (без изменений)
-if sys.prefix == sys.base_prefix:
-    project_root = Path(__file__).parent
-    venv_dir = project_root / ".venv"
-    if sys.platform == "win32":
-        venv_python = venv_dir / "Scripts" / "python.exe"
-    else:
-        venv_python = venv_dir / "bin" / "python"
-    if not venv_python.exists():
-        print("\n\033[91mОшибка: Виртуальное окружение не найдено!\033[0m")
-        print(
-            f"\033[93mПожалуйста, запустите 'python {project_root / 'start.py'}' для первоначальной настройки.\033[0m"
-        )
-        sys.exit(1)
-    print(
-        f"\033[94mНе в виртуальном окружении. Перезапуск с использованием: {venv_python}\033[0m"
-    )
-    try:
-        # nosemgrep
-        os.execv(str(venv_python), [str(venv_python)] + sys.argv)  # nosec B606
-    except Exception as e:
-        print(f"\n\033[91mКритическая ошибка при попытке перезапуска: {e}\033[0m")
-        sys.exit(1)
 
 
 logging.basicConfig(
@@ -380,7 +396,6 @@ class Api:
             logger.error(f"Ошибка загрузки или парсинга chats.json: {e}")
             return {}
 
-    # ==================== ИЗМЕНЕНИЕ: Новые функции для ключей API ====================
     def save_api_keys(self, keys_data: dict) -> dict:
         """Сохраняет ключи API в файл api_keys.json."""
         try:
@@ -405,8 +420,6 @@ class Api:
         except (json.JSONDecodeError, OSError) as e:
             logger.error(f"Ошибка загрузки или парсинга api_keys.json: {e}")
             return {}
-
-    # ===============================================================================
 
 
 if __name__ == "__main__":
