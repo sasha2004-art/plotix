@@ -449,6 +449,24 @@ window.addEventListener('pywebviewready', async () => {
             } catch (error) { console.error('Error fetching local models:', error); }
             return;
         }
+        if (selectedProvider === 'vps_proxy') {
+        const groqModels = [
+            "llama3-8b-8192",
+            "llama3-70b-8192",
+            "deepseek-r1-distill-llama-70b",
+        ];
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = "Доступно через прокси";
+        groqModels.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            optgroup.appendChild(option);
+        });
+        modelSelector.appendChild(optgroup);
+        modelSelectorGroup.style.display = 'block';
+        return; 
+        }
 
         const apiKey = localStorage.getItem(`${selectedProvider}_api_key`);
         if (!apiKey) return;
@@ -553,7 +571,7 @@ window.addEventListener('pywebviewready', async () => {
         const selectedProvider = document.querySelector('input[name="api_provider"]:checked').value;
         const selectedModel = modelSelector.value;
         const apiKey = localStorage.getItem(`${selectedProvider}_api_key`) || '';
-        if (!setting || !selectedModel || (!apiKey && selectedProvider !== 'local')) {
+        if (!setting || !selectedModel || (!apiKey && selectedProvider !== 'local' && selectedProvider !== 'vps_proxy')) {
             alert('Пожалуйста, введите сеттинг, выберите модель и убедитесь, что API ключ добавлен.'); return;
         }
         resultBox.textContent = 'Генерация...'; graphBox.innerHTML = '<p>Генерация...</p>';

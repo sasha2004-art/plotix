@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import requests
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -9,12 +10,11 @@ import google.generativeai as genai
 import openai
 from groq import Groq
 
-# --- ИЗМЕНЕНИЕ: Тестируемый импорт опциональной зависимости ---
+
 try:
     from llama_cpp import Llama  # type: ignore[reportMissingImports]
 except ImportError:
     Llama = None
-# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +124,19 @@ def create_quest_from_setting(
                 stream=False,
             )
             response_content = chat_completion["choices"][0]["message"]["content"]  # type: ignore
+            
+        elif api_provider == "vps_proxy":
+            proxy_url = "http://91.184.253.216:5001/proxy/generate"
+            
+            payload = {"prompt": master_prompt, "model": model}
+            
+            logger.info(f"Отправка запроса на VPS прокси: {proxy_url}")
+            
+            response = requests.post(proxy_url, json=payload, timeout=120)
+            
+            response.raise_for_status()
+            
+            response_content = response.text
 
         else:
             logger.error(f"Unknown API provider: {api_provider}")
