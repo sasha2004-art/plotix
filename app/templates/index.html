@@ -82,6 +82,13 @@
                                 <button class="tab-link active" id="graph-tab">Граф</button>
                                 <button class="tab-link" id="json-tab">JSON</button>
                             </div>
+                            <div class="edit-mode-toggle">
+                                <label for="edit-mode-checkbox" class="toggle-label">
+                                    <span class="toggle-text">Режим правки</span>
+                                    <input type="checkbox" id="edit-mode-checkbox" class="toggle-switch">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
                             <div class="result-box-actions">
                                 <button id="download-result-btn" class="icon-btn" title="Сохранить JSON">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -153,5 +160,17 @@
         };
     </script>
     <div id="graph-tooltip" class="graph-tooltip"></div>
+    <div id="graph-context-menu" class="context-menu">
+        <ul>
+            <li data-action="edit-node" class="context-menu-item node-action">Редактировать узел</li>
+            <li data-action="delete-node" class="context-menu-item node-action">Удалить узел</li>
+            <li data-action="add-edge" class="context-menu-item node-action">Добавить ребро (отсюда)</li>
+            <hr class="edge-action-separator" />
+            <li data-action="edit-edge" class="context-menu-item edge-action">Редактировать ребро</li>
+            <li data-action="delete-edge" class="context-menu-item edge-action">Удалить ребро</li>
+            <hr class="graph-action-separator" />
+            <li data-action="add-node" class="context-menu-item graph-action">Добавить новый узел</li>
+        </ul>
+    </div>
 </body>
 </html>

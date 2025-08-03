@@ -602,3 +602,96 @@ pre {
 #graph-box .edgeLabel {
     font-size: 22px !important;
 }
+
+.edit-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto; /* Сдвигает переключатель вправо */
+    padding-right: 15px;
+}
+
+.toggle-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-switch {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 20px;
+    background-color: var(--bg-task-card-footer);
+    border-radius: 20px;
+    transition: background-color 0.2s;
+}
+
+.toggle-slider:before {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: var(--bg-main);
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+}
+
+.toggle-switch:checked + .toggle-slider {
+    background-color: var(--accent-primary);
+}
+
+.toggle-switch:checked + .toggle-slider:before {
+    transform: translateX(14px);
+}
+
+.context-menu {
+    position: absolute;
+    z-index: 10001;
+    background-color: var(--bg-sidebar-container);
+    border: 1px solid var(--bg-task-card-footer);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    padding: 5px 0;
+    display: none; /* Скрыто по умолчанию */
+    min-width: 220px;
+}
+
+.context-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.context-menu .context-menu-item {
+    padding: 8px 15px;
+    font-size: 14px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.context-menu .context-menu-item:hover {
+    background-color: var(--accent-primary);
+    color: var(--text-sidebar);
+}
+
+.context-menu hr {
+    border: none;
+    border-top: 1px solid var(--bg-task-card-footer);
+    margin: 4px 0;
+}
+
+.context-menu .hidden {
+    display: none;
+}
