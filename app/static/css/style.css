@@ -365,7 +365,6 @@ pre {
     color: var(--accent-failed);
 }
 
-/* ИЗМЕНЕНИЕ: Добавлен новый стиль для кнопки удаления на карточке модели */
 .delete-btn-card {
     font-size: 14px;
     padding: 8px 12px;
@@ -586,8 +585,8 @@ pre {
 
 
 #graph-box .node rect {
-    min-width: 150px !important;
-    min-height: 50px !important;
+    min-width: 200px !important; 
+    min-height: 70px !important; 
 }
 
 #graph-box .nodeLabel {
