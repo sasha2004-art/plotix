@@ -2,7 +2,7 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, Response, stream_with_context
 
 
 from .models.recommended_models import RECOMMENDED_MODELS
@@ -62,12 +62,15 @@ def generate_quest_endpoint():
     api_provider = data["api_provider"]
     model = data["model"]
 
-    quest_json = create_quest_from_setting(setting, api_key, api_provider, model)
+    def generate_stream():
+        """Оборачивает генератор квестов для потоковой передачи."""
+        quest_generator = create_quest_from_setting(setting, api_key, api_provider, model)
+        for progress_update in quest_generator:
+            # Отправляем каждую JSON-строку с символом новой строки
+            yield progress_update + '\n'
 
-    if "error" in quest_json:
-        return jsonify(quest_json), 500
-
-    return jsonify(quest_json)
+    # Используем mimetype 'application/x-ndjson' для потоковой передачи JSON, разделенного новой строкой
+    return Response(stream_with_context(generate_stream()), mimetype='application/x-ndjson')
 
 
 @app.route("/validate_api_key", methods=["POST"])

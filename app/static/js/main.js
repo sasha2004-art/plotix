@@ -574,21 +574,78 @@ window.addEventListener('pywebviewready', async () => {
         if (!setting || !selectedModel || (!apiKey && selectedProvider !== 'local' && selectedProvider !== 'vps_proxy')) {
             alert('Пожалуйста, введите сеттинг, выберите модель и убедитесь, что API ключ добавлен.'); return;
         }
-        resultBox.textContent = 'Генерация...'; graphBox.innerHTML = '<p>Генерация...</p>';
-        generateBtn.disabled = true; window.chats[window.activeChatId].setting = setting;
-        showTab('graph');
+
+        resultBox.textContent = 'Подключение к серверу...';
+        graphBox.innerHTML = '<p>Подключение к серверу...</p>';
+        generateBtn.disabled = true;
+        window.chats[window.activeChatId].setting = setting;
+        showTab('json'); 
+
         try {
-            const response = await fetch('/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ setting, api_key: apiKey, api_provider: selectedProvider, model: selectedModel, }), });
-            const data = await response.json();
-            const resultText = response.ok ? JSON.stringify(data, null, 2) : `Ошибка: ${data.error || 'Неизвестная ошибка сервера'}`;
-            window.chats[window.activeChatId].result = resultText; resultBox.textContent = resultText;
-            if (response.ok) await renderQuestGraph(resultText);
-            else graphBox.innerHTML = `<p class="status-error">${data.error || 'Неизвестная ошибка сервера'}</p>`;
+            const response = await fetch('/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ setting, api_key: apiKey, api_provider: selectedProvider, model: selectedModel }),
+            });
+            
+            if (!response.ok) {
+                 const errorData = await response.json();
+                 throw new Error(errorData.error || `Ошибка сервера: ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let finalQuestData = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+                for (const line of lines) {
+                    try {
+                        const progressUpdate = JSON.parse(line);
+
+                        if (progressUpdate.status === 'error') {
+                            throw new Error(progressUpdate.message);
+                        }
+
+                        if (progressUpdate.message) {
+                            resultBox.textContent = progressUpdate.message;
+                            graphBox.innerHTML = `<p>${progressUpdate.message}</p>`;
+                        }
+
+                        if (progressUpdate.status === 'done' && progressUpdate.quest) {
+                            finalQuestData = progressUpdate.quest;
+                        }
+                    } catch (e) {
+                        console.error("Ошибка парсинга JSON-строки из потока:", line, e);
+                    }
+                }
+            }
+
+            if (finalQuestData) {
+                const resultText = JSON.stringify(finalQuestData, null, 2);
+                window.chats[window.activeChatId].result = resultText;
+                resultBox.textContent = resultText;
+                await renderQuestGraph(resultText);
+                showTab('graph');
+            } else {
+                 throw new Error("Поток завершился без финального результата.");
+            }
+
         } catch (error) {
-            console.error('Fetch Error:', error); const errorMsg = 'Сетевая ошибка.';
-            window.chats[window.activeChatId].result = errorMsg; resultBox.textContent = errorMsg; graphBox.innerHTML = `<p class="status-error">${errorMsg}</p>`;
+            console.error('Fetch/Stream Error:', error);
+            const errorMsg = `Ошибка: ${error.message}`;
+            window.chats[window.activeChatId].result = errorMsg;
+            resultBox.textContent = errorMsg;
+            graphBox.innerHTML = `<p class="status-error">${errorMsg}</p>`;
+            showTab('json');
         } finally {
-            generateBtn.disabled = false; debouncedSaveChats();
+            generateBtn.disabled = false;
+            debouncedSaveChats();
         }
     });
 
