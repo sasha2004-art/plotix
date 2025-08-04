@@ -2,14 +2,14 @@ import json
 import logging
 import os
 import re
-import time # <--- ДОБАВЛЕНО
+import time
 import requests
 from pathlib import Path
 from typing import Any, Dict, List, Iterator, Set
 
 import google.generativeai as genai
 import openai
-from groq import Groq, APIStatusError # <--- ИЗМЕНЕНО
+from groq import Groq, APIStatusError
 
 try:
     from llama_cpp import Llama  # type: ignore[reportMissingImports]
@@ -100,33 +100,33 @@ def _get_scene_list_from_concept_prompt(plot_concept: str) -> str:
 
 # ЭТАП 3: ПРОМПТ ДЛЯ "РЕЖИССЁРА"
 def _get_graph_from_scenes_prompt(scene_list_json: str) -> str:
-    """Создает полный JSON-скелет, добавляя связи и выборы к плоскому списку сцен."""
-    return f"""
-Ты — геймдизайнер-нарративщик. Тебе дан список игровых ситуаций. Твоя задача — связать их в логичный, нелинейный квест.
-**СПИСОК ИГРОВЫХ СИТУАЦИЙ (СЦЕН):**
----
-{scene_list_json}
----
-**ТВОЯ ЗАДАЧА:**
-Доработай этот JSON, превратив его в полноценный квестовый граф. Для этого:
-1.  Определи, какая сцена должна быть стартовой, и добавь корневой ключ `"start_scene"`.
-2.  Для КАЖДОЙ сцены добавь поле `"choices"`.
-3.  В поле `"choices"` создай 2-3 варианта выбора для игрока. Каждый выбор должен быть объектом с полями:
-    - `"choice_summary"`: Краткое описание ДЕЙСТВИЯ игрока (например, "Обыскать стол").
-    - `"next_scene"`: `scene_id` сцены, к которой приведет этот выбор.
-**КЛЮЧЕВЫЕ ПРАВИЛА:**
-- **Логика:** Связи должны быть логичными и соответствовать описаниям сцен.
-- **Нелинейность:** Создай хотя бы одну развилку.
-- **ЗАПРЕТ ЦИКЛОВ (КРИТИЧЕСКИ ВАЖНО):** Сюжет должен всегда двигаться ВПЕРЕД. Создай строго ациклический граф (DAG). Возвраты в пройденные сцены категорически запрещены.
-Верни ПОЛНЫЙ и готовый JSON-скелет квеста.
-"""
+     """Создает полный JSON-скелет, добавляя связи и выборы к плоскому списку сцен."""
+     return f"""
+ Ты — геймдизайнер-нарративщик. Тебе дан список игровых ситуаций. Твоя задача — связать их в логичный, нелинейный квест.
+ **СПИСОК ИГРОВЫХ СИТУАЦИЙ (СЦЕН):**
+ ---
+ {scene_list_json}
+ ---
+ **ТВОЯ ЗАДАЧА:**
+ Доработай этот JSON, превратив его в полноценный квестовый граф. Для этого:
+ 1.  Определи, какая сцена должна быть стартовой, и добавь корневой ключ `"start_scene"`.
+ 2.  Для КАЖДОЙ сцены добавь поле `"choices"`.
+ 3.  В поле `"choices"` создай 2-3 варианта выбора для игрока. Каждый выбор должен быть объектом с полями:
+     - `"choice_summary"`: Краткое описание ДЕЙСТВИЯ игрока (например, "Обыскать стол").
+     - `"next_scene"`: `scene_id` сцены, к которой приведет этот выбор.
+ 4.  **ОЧЕНЬ ВАЖНО:** Для каждой сцены в списке `scenes`, верни также поле `"summary"`, которое было в твоем ВХОДНОМ списке. Поле `"text"` должно отсутствовать или быть пустым на этом этапе.
+ **КЛЮЧЕВЫЕ ПРАВИЛА:**
+ - **Логика:** Связи должны быть логичными и соответствовать описаниям сцен.
+ - **Нелинейность:** Создай хотя бы одну развилку.
+ - **ЗАПРЕТ ЦИКЛОВ (КРИТИЧЕСКИ ВАЖНО):** Сюжет должен всегда двигаться ВПЕРЕД. Создай строго ациклический граф (DAG). Возвраты в пройденные сцены категорически запрещены.
+ Верни ПОЛНЫЙ и готовый JSON-скелет квеста.
+ """
 
 
 # ЭТАП 4: ПРОМПТ ДЛЯ "СЦЕНАРИСТА"
 def _get_scene_detail_prompt(
     setting_text: str, scene_summary: str, history_choice: str, previous_scene_text: str
 ) -> str:
-    # ... (без изменений)
     previous_scene_block = (f'ПРЕДЫДУЩАЯ СИТУАЦИЯ (ПОЛНЫЙ ТЕКСТ):\n---\n{previous_scene_text}\n---\n' if previous_scene_text else "Это стартовая ситуация квеста.")
     return f"""
 Ты — талантливый сценарист интерактивных историй. Твоя задача — описать игровую ситуацию для ИГРОКА, продолжая повествование.
@@ -215,20 +215,33 @@ def _call_llm(prompt: str, api_provider: str, api_key: str, model: str, force_te
             return json_match.group(1) if json_match else response_content
 
         except (APIStatusError, openai.APIStatusError, requests.exceptions.HTTPError) as e:
-            status_code = -1
-            if hasattr(e, 'status_code'):
-                status_code = e.status_code
-            elif hasattr(e, 'response') and hasattr(e.response, 'status_code'):
-                status_code = e.response.status_code
+            status_code = getattr(e, 'status_code', None) or getattr(e.response, 'status_code', -1)
 
             is_retryable = status_code == 429 or status_code >= 500
 
             if is_retryable and attempt < max_retries - 1:
-                logger.warning(
-                    f"API вернуло ошибку {status_code}. Повторная попытка через {delay:.1f} сек... (Попытка {attempt + 1}/{max_retries})"
+                wait_time = delay
+                log_message = (
+                    f"API вернуло ошибку {status_code}. Повторная попытка через {delay:.1f} сек... "
+                    f"(Попытка {attempt + 1}/{max_retries})"
                 )
-                time.sleep(delay)
-                delay *= 2  # Экспоненциальная задержка
+
+                # Специальная обработка для Groq Rate Limit с извлечением времени ожидания
+                if api_provider == "groq" and status_code == 429:
+                    error_str = str(e)
+                    match = re.search(r"try again in (?:(\d+)m)?\s*(?:([\d.]+)s)?", error_str)
+                    if match:
+                        minutes = float(match.group(1)) if match.group(1) else 0
+                        seconds = float(match.group(2)) if match.group(2) else 0
+                        wait_time = minutes * 60 + seconds + 1  # Добавляем 1 секунду буфера
+                        log_message = (
+                            f"Groq API rate limit. Ожидание {wait_time:.1f} сек "
+                            f"(извлечено из ответа API)... (Попытка {attempt + 1}/{max_retries})"
+                        )
+
+                logger.warning(log_message)
+                time.sleep(wait_time)
+                delay *= 2  # Увеличиваем задержку для следующей возможной не-Groq ошибки
                 continue
             else:
                 logger.error(f"Не удалось выполнить запрос к API после {attempt + 1} попыток или ошибка не является временной.")
@@ -240,7 +253,6 @@ def _call_llm(prompt: str, api_provider: str, api_key: str, model: str, force_te
 
 # ЭТАП 5: "ЦЕНЗОР" (ФИНАЛЬНАЯ ВАЛИДАЦИЯ)
 def _validate_and_clean_quest(quest_json: Dict[str, Any]) -> Dict[str, Any]:
-    # ... (без изменений)
     if "scenes" not in quest_json or not quest_json["scenes"]: return quest_json
     all_scene_ids = {scene["scene_id"] for scene in quest_json["scenes"]}
     reachable_ids: Set[str] = set()
@@ -308,11 +320,15 @@ def create_quest_from_setting(
 
         # Этап 4: Сценарист
         final_quest = skeleton_json.copy()
-        # ... (логика детализации без изменений)
+        # ИСПРАВЛЕНИЕ: Исправлен отступ для этого и последующих блоков кода
         scene_map, parent_map = {s['scene_id']: s for s in final_quest['scenes']}, {}
         for scene in final_quest['scenes']:
             for choice in scene.get('choices', []):
-                if 'next_scene' in choice: parent_map[choice['next_scene']] = { "parent_id": scene['scene_id'], "choice_summary": choice.get('choice_summary', '...')}
+                if 'next_scene' in choice: 
+                    parent_map[choice['next_scene']] = { 
+                        "parent_id": scene['scene_id'], 
+                        "choice_summary": choice.get('choice_summary', '...')
+                    }
         for i, scene_to_detail in enumerate(final_quest["scenes"]):
             scene_id, summary = scene_to_detail["scene_id"], scene_to_detail.get("summary", "Нет описания.")
             yield json.dumps({ "status": "detailing_scene", "message": f'4/6: Сценарист пишет текст для сцены {i + 1}/{len(final_quest["scenes"])}...'})
@@ -321,11 +337,13 @@ def create_quest_from_setting(
             if parent_info:
                 parent_id, choice_summary = parent_info['parent_id'], parent_info['choice_summary']
                 parent_scene_data = scene_map.get(parent_id)
-                if parent_scene_data and 'text' in parent_scene_data: previous_scene_text = parent_scene_data['text']
+                if parent_scene_data and 'text' in parent_scene_data: 
+                    previous_scene_text = parent_scene_data['text']
                 history_choice = f"Вы решили: '{choice_summary}'. Это привело вас к следующей ситуации: '{summary}'."
             detail_prompt = _get_scene_detail_prompt(setting_text, summary, history_choice, previous_scene_text)
             detailed_str = _call_llm(detail_prompt, api_provider, api_key, model, force_text_response=False)
-            if i < len(final_quest["scenes"]) -1: time.sleep(1) # Пауза между запросами
+            if i < len(final_quest["scenes"]) -1: 
+                time.sleep(1) # Пауза между запросами
             detailed_json = json.loads(detailed_str)
             scene_to_detail["text"] = detailed_json.get("text", "Описание не было сгенерировано.")
             scene_map[scene_id]["text"] = scene_to_detail["text"]
@@ -333,7 +351,6 @@ def create_quest_from_setting(
             for choice_idx, choice in enumerate(scene_to_detail.get("choices", [])):
                 choice["text"] = detailed_choices_text[choice_idx] if choice_idx < len(detailed_choices_text) else choice.get("choice_summary", "...")
                 choice.pop("choice_summary", None)
-            scene_to_detail.pop("summary", None)
 
         # Этап 5: Цензор
         yield json.dumps({"status": "validating", "message": "5/6: Цензор проверяет структуру..."})
@@ -350,7 +367,6 @@ def create_quest_from_setting(
 
     except Exception as e:
         logger.error(f"Ошибка в многоэтапной генерации: {e}", exc_info=True)
-        # ... (обработка ошибок)
         error_message_lower = str(e).lower()
         error_map = { "quota": "Превышен лимит API.", "insufficient_quota": "Превышен лимит API.", "invalid api key": "Неверный API ключ.", "401": "Неверный API ключ.", "429": "Превышен лимит запросов к API. Попробуйте позже."}
         for key, msg in error_map.items():
@@ -362,7 +378,6 @@ def create_quest_from_setting(
 
 
 def validate_api_key(api_provider: str, api_key: str) -> Dict[str, Any]:
-    # ... (без изменений)
     try:
         if api_provider == "groq":
             client = Groq(api_key=api_key); client.models.list()
@@ -387,7 +402,6 @@ def validate_api_key(api_provider: str, api_key: str) -> Dict[str, Any]:
 
 
 def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
-    # ... (без изменений)
     try:
         if api_provider == "local":
             model_dir_str = os.getenv("LOCAL_MODEL_PATH", "quest-generator/models")
@@ -442,7 +456,6 @@ def get_available_models(api_provider: str, api_key: str) -> Dict[str, Any]:
 
 
 def delete_local_models(filenames: List[str]) -> Dict[str, Any]:
-    # ... (без изменений)
     model_dir_str = os.getenv("LOCAL_MODEL_PATH", "quest-generator/models")
     model_dir = Path(model_dir_str)
     deleted_files, errors = [], []

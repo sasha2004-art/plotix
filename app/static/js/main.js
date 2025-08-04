@@ -721,6 +721,32 @@ window.addEventListener('pywebviewready', async () => {
         }
     });
 
+    downloadResultBtn.addEventListener('click', async () => {
+        if (!window.activeChatId || !window.chats[window.activeChatId]) {
+            alert("Нет активного чата для сохранения.");
+            return;
+        }
+        const contentToSave = window.chats[window.activeChatId].result;
+        try {
+            // Проверяем, что это валидный JSON, перед сохранением
+            JSON.parse(contentToSave);
+        } catch (e) {
+            alert('Невозможно сохранить, так как результат не является валидным JSON.');
+            return;
+        }
+        try {
+            // Вызываем функцию из Python API для открытия диалога сохранения
+            const result = await api.save_quest_to_file(contentToSave);
+            // Показываем сообщение только если пользователь не отменил сохранение
+            if (result.status !== 'cancelled') {
+                alert(result.message);
+            }
+        } catch (error) {
+            console.error('Ошибка при сохранении файла:', error);
+            alert('Произошла критическая ошибка при попытке сохранить файл.');
+        }
+    });
+
     generateBtn.addEventListener('click', async () => {
         if (!window.activeChatId) createNewChat();
         const setting = settingInput.value.trim();
