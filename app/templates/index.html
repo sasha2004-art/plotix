@@ -115,6 +115,7 @@
                                 <label><input type="radio" name="api_provider" value="openai"> OpenAI</label>
                                 <label><input type="radio" name="api_provider" value="gemini"> Gemini</label>
                                 <label><input type="radio" name="api_provider" value="vps_proxy"> VPS API</label>
+                                <label><input type="radio" name="api_provider" value="test"> Тест</label>
                                 {% if use_local_llm %}
                                 <label><input type="radio" name="api_provider" value="local"> Локальный</label>
                                 {% endif %}
@@ -235,6 +236,29 @@
             <hr class="graph-action-separator" />
             <li data-action="add-node" class="context-menu-item graph-action">Добавить новый узел</li>
         </ul>
+    </div>
+
+
+    
+    <div id="test-mode-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="test-mode-title">Тестовый режим</h2>
+            <h4 id="test-mode-step-indicator" style="color: var(--text-muted); margin-top: -10px;"></h4>
+            <h4>Промпт для модели:</h4>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <pre id="test-mode-prompt-display" style="max-height: 200px; overflow-y: auto; background-color: var(--bg-sidebar); padding: 10px; border-radius: 4px; flex-grow: 1;"></pre>
+                <button id="test-mode-copy-prompt-btn" class="icon-btn" title="Копировать промпт">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-5zm0 16H8V7h11v14z"/></svg>
+                </button>
+            </div>
+            <h4>Вставьте ответ модели сюда:</h4>
+            <textarea id="test-mode-response-input" rows="8"></textarea>
+            <div id="test-mode-status" class="status-message" style="margin-top: 10px;"></div>
+            <div class="modal-actions">
+                <button id="test-mode-cancel-btn">Отмена</button>
+                <button id="test-mode-submit-btn">Продолжить</button>
+            </div>
+        </div>
     </div>
 </body>
 </html>

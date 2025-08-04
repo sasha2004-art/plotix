@@ -1,4 +1,3 @@
-// Вся логика теперь будет выполняться только после того, как pywebview API будет полностью готово.
 window.addEventListener('pywebviewready', async () => {
     // ==================== API И КОНСТАНТЫ ====================
     const api = window.pywebview.api;
@@ -28,7 +27,19 @@ window.addEventListener('pywebviewready', async () => {
     const sceneChoicesContainer = document.getElementById('scene-choices-container');
     const restartPreviewBtn = document.getElementById('restart-preview-btn');
     const sidebar = document.querySelector('.sidebar');
-    
+
+    // Элементы для тестового режима (теперь правильно в области видимости)
+    const testModeModal = document.getElementById('test-mode-modal');
+    const testModeTitle = document.getElementById('test-mode-title');
+    const testModeStepIndicator = document.getElementById('test-mode-step-indicator');
+    const testModePromptDisplay = document.getElementById('test-mode-prompt-display');
+    const testModeResponseInput = document.getElementById('test-mode-response-input');
+    const testModeStatus = document.getElementById('test-mode-status');
+    const testModeSubmitBtn = document.getElementById('test-mode-submit-btn');
+    const testModeCancelBtn = document.getElementById('test-mode-cancel-btn');
+    const testModeCopyPromptBtn = document.getElementById('test-mode-copy-prompt-btn'); // Новый элемент
+
+
     const editModeCheckbox = document.getElementById('edit-mode-checkbox');
     const contextMenu = document.getElementById('graph-context-menu');
     let isEditMode = false;
@@ -123,7 +134,7 @@ window.addEventListener('pywebviewready', async () => {
             console.error("Could not sync API keys from file:", e);
         }
     }
-    
+
     // ==================== ЛОГИКА КОНТЕКСТНОГО МЕНЮ ====================
 
     function showContextMenu({ x, y, type, targetId, edgeData }) {
@@ -166,7 +177,7 @@ window.addEventListener('pywebviewready', async () => {
         renderQuestGraph(newResultString);
         debouncedSaveChats();
     }
-    
+
     function editNode(nodeId) {
         let data = getCurrentQuestData();
         if (!data) return;
@@ -182,7 +193,7 @@ window.addEventListener('pywebviewready', async () => {
             updateQuestData(data);
         }
     }
-    
+
     function deleteNode(nodeId) {
         let data = getCurrentQuestData();
         if (!data) return;
@@ -219,7 +230,7 @@ window.addEventListener('pywebviewready', async () => {
         data.scenes.push({ scene_id: newId, text: "Новый узел. Отредактируйте его.", choices: [] });
         updateQuestData(data);
     }
-    
+
     function addEdge(fromNodeId) {
         let data = getCurrentQuestData();
         if (!data) return;
@@ -227,7 +238,7 @@ window.addEventListener('pywebviewready', async () => {
         if (!fromScene) {
             alert(`Внутренняя ошибка: не удалось найти узел-источник с ID "${fromNodeId}"`); return;
         }
-        
+
         const existingNodeIds = data.scenes.map(s => s.scene_id).join(', ');
         const toNodeId = prompt(`Введите ID узла, к которому ведет переход:\n(Доступные: ${existingNodeIds})`);
         if (!toNodeId || !data.scenes.some(s => s.scene_id === toNodeId.trim())) {
@@ -272,7 +283,7 @@ window.addEventListener('pywebviewready', async () => {
     }
 
     // ==================== ЛОГИКА ГРАФА И РЕНДЕРИНГА (ИСПРАВЛЕНО) ====================
-    
+
     function attachGraphEventListeners(edgeMap) {
         if (!isEditMode) return;
         const svg = graphBox.querySelector('svg');
@@ -323,18 +334,18 @@ window.addEventListener('pywebviewready', async () => {
             const sceneDataMap = new Map(questData.scenes.map(scene => [scene.scene_id, scene]));
             const allSceneIds = new Set(questData.scenes.map(s => s.scene_id));
             questData.scenes.forEach(scene => scene.choices?.forEach(c => c.next_scene && allSceneIds.add(c.next_scene)));
-            
+
             const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
             const themeVariables = { fontSize: '14px', primaryColor: isDarkTheme ? '#28252b' : '#ffffff', primaryTextColor: isDarkTheme ? '#ffffff' : '#000000', primaryBorderColor: isDarkTheme ? '#bfb8dd' : '#555555', lineColor: isDarkTheme ? '#bfb8dd' : '#555555', secondaryColor: '#715cd7', secondaryTextColor: '#ffffff', strokeWidth: '2px' };
             const formatText = (text = '', len = 20) => `"${text.replace(/"/g, '#quot;').split(' ').reduce((acc, word) => { let lastLine = acc[acc.length - 1]; if(lastLine && (lastLine.length + word.length + 1) < len) { acc[acc.length - 1] = `${lastLine} ${word}`; } else { acc.push(word); } return acc; }, []).join('<br>')}"`;
-            
+
             let mermaidDefinition = `%%{init: {'theme': 'base', 'themeVariables': ${JSON.stringify(themeVariables)}}}%%\ngraph TD\n`;
-            
+
             // ИСПРАВЛЕНИЕ: Определяем узлы с их реальными ID, Mermaid справится
             allSceneIds.forEach(id => {
                 mermaidDefinition += `    ${id}["${id}"]\n`;
             });
-            
+
             const edgeMap = new Map();
             let edgeCounter = 0;
             questData.scenes.forEach(scene => {
@@ -347,9 +358,9 @@ window.addEventListener('pywebviewready', async () => {
                     });
                 }
             });
-            
+
             mermaidDefinition += `    style ${questData.start_scene} fill:${themeVariables.secondaryColor},stroke:${themeVariables.secondaryColor},color:${themeVariables.secondaryTextColor},font-weight:bold\n`;
-            
+
             graphBox.innerHTML = mermaidDefinition;
             graphBox.removeAttribute('data-processed');
             await mermaid.run({ nodes: [graphBox] });
@@ -368,7 +379,7 @@ window.addEventListener('pywebviewready', async () => {
                 });
                 nodeEl.addEventListener('mouseout', () => { tooltip.style.display = 'none'; });
             });
-            
+
             attachGraphEventListeners(edgeMap);
 
         } catch (error) {
@@ -463,7 +474,7 @@ window.addEventListener('pywebviewready', async () => {
         resultBox.textContent = chat.result;
 
         const settings = chat.generation_settings || { scene_count: 8, tone: '', pacing: '', narrative_elements: [] };
-        
+
         document.getElementById('scene-count-input').value = settings.scene_count;
         document.getElementById('tone-input').value = settings.tone;
         document.getElementById('pacing-input').value = settings.pacing;
@@ -472,7 +483,7 @@ window.addEventListener('pywebviewready', async () => {
 
         // 1. Удаляем все старые кастомные чекбоксы, чтобы избежать дублирования.
         document.querySelectorAll('.custom-narrative-element').forEach(el => el.remove());
-        
+
         // 2. Создаем КОНСТАНТНЫЙ список стандартных элементов. Это ключ к исправлению.
         const PREDEFINED_ELEMENTS = new Set(['moral_dilemma', 'unreliable_npc', 'false_trail', 'multiple_endings']);
         const narrativeContainer = document.getElementById('narrative-elements-group');
@@ -482,20 +493,20 @@ window.addEventListener('pywebviewready', async () => {
         document.querySelectorAll('input[name="narrative_element"]').forEach(checkbox => {
             checkbox.checked = allElementsToDisplay.includes(checkbox.value);
         });
-        
+
         // 4. Проходим по сохраненным элементам и создаем чекбоксы для тех, которых нет в стандартном списке.
         allElementsToDisplay.forEach(elementValue => {
             if (!PREDEFINED_ELEMENTS.has(elementValue)) {
                 // Этот элемент - кастомный, создаем его.
                 const label = document.createElement('label');
                 label.className = 'custom-narrative-element';
-                
+
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.name = 'narrative_element';
                 checkbox.value = elementValue;
                 checkbox.checked = true; // Он сохранен, значит должен быть отмечен.
-                
+
                 label.appendChild(checkbox);
                 label.appendChild(document.createTextNode(' ' + elementValue));
                 narrativeContainer.appendChild(label);
@@ -503,7 +514,7 @@ window.addEventListener('pywebviewready', async () => {
         });
         // --- КОНЕЦ ИСПРАВЛЕНИЯ ЛОГИКИ ---
 
-        renderQuestGraph(chat.result); 
+        renderQuestGraph(chat.result);
         renderChatList();
         saveChats(); // saveChats здесь не обязателен, но не повредит
     }
@@ -511,10 +522,10 @@ window.addEventListener('pywebviewready', async () => {
     function createNewChat() {
     const newChatId = `chat_${Date.now()}`;
     const initialResult = JSON.stringify({ start_scene: "scene_1", scenes: [{ scene_id: "scene_1", text: "Это стартовая сцена. Включите 'Режим правки' и кликните правой кнопкой мыши, чтобы начать.", choices: [] }] }, null, 2);
-    window.chats[newChatId] = { 
-        id: newChatId, 
-        title: `Новый чат ${Object.keys(window.chats).length + 1}`, 
-        setting: '', 
+    window.chats[newChatId] = {
+        id: newChatId,
+        title: `Новый чат ${Object.keys(window.chats).length + 1}`,
+        setting: '',
         result: initialResult,
         generation_settings: {
             scene_count: 8,
@@ -532,18 +543,21 @@ window.addEventListener('pywebviewready', async () => {
         modelSelector.innerHTML = '';
         modelSelectorGroup.style.display = 'none';
 
-        if (selectedProvider === 'local') {
-            try {
-                const response = await fetch('/api/local_models');
-                const data = await response.json();
-                if (response.ok && data.models && data.models.length > 0) {
-                    data.models.forEach(model => {
-                        const option = document.createElement('option');
-                        option.value = model.name; option.textContent = model.name; modelSelector.appendChild(option);
-                    });
-                    modelSelectorGroup.style.display = 'block';
-                }
-            } catch (error) { console.error('Error fetching local models:', error); }
+        if (selectedProvider === 'local' || selectedProvider === 'test') {
+            if (selectedProvider === 'local') {
+                try {
+                    const response = await fetch('/api/local_models');
+                    const data = await response.json();
+                    if (response.ok && data.models && data.models.length > 0) {
+                        data.models.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.name; option.textContent = model.name; modelSelector.appendChild(option);
+                        });
+                        modelSelectorGroup.style.display = 'block';
+                    }
+                } catch (error) { console.error('Error fetching local models:', error); }
+            }
+            // Для 'test' режима не нужно выбирать модели
             return;
         }
         if (selectedProvider === 'vps_proxy') {
@@ -562,7 +576,7 @@ window.addEventListener('pywebviewready', async () => {
         });
         modelSelector.appendChild(optgroup);
         modelSelectorGroup.style.display = 'block';
-        return; 
+        return;
         }
 
         const apiKey = localStorage.getItem(`${selectedProvider}_api_key`);
@@ -626,7 +640,7 @@ window.addEventListener('pywebviewready', async () => {
         }
         hideContextMenu();
     });
-    
+
 
     if (sidebar) {
         sidebar.addEventListener('mouseenter', () => sidebar.classList.remove('collapsed'));
@@ -643,7 +657,7 @@ window.addEventListener('pywebviewready', async () => {
     // --- НАЧАЛО ИСПРАВЛЕННОГО БЛОКА ---
     function saveGenerationSettings() {
         if (!window.activeChatId || !window.chats[window.activeChatId]) return;
-        
+
         const sceneCountInput = document.getElementById('scene-count-input');
         const toneInput = document.getElementById('tone-input');
         const pacingInput = document.getElementById('pacing-input');
@@ -654,7 +668,7 @@ window.addEventListener('pywebviewready', async () => {
             pacing: pacingInput ? pacingInput.value.trim() : '',
             narrative_elements: Array.from(document.querySelectorAll('input[name="narrative_element"]:checked')).map(cb => cb.value)
         };
-        
+
         window.chats[window.activeChatId].generation_settings = settings;
         debouncedSaveChats();
     }
@@ -677,7 +691,7 @@ window.addEventListener('pywebviewready', async () => {
     document.getElementById('tone-input').addEventListener('input', saveGenerationSettings);
     document.getElementById('pacing-input').addEventListener('input', saveGenerationSettings);
     document.getElementById('narrative-elements-group').addEventListener('change', saveGenerationSettings);
-    
+
     function showTab(tabName) {
         hideContextMenu();
         if (tabName === 'graph') {
@@ -726,6 +740,18 @@ window.addEventListener('pywebviewready', async () => {
         const setting = settingInput.value.trim();
         const selectedProvider = document.querySelector('input[name="api_provider"]:checked').value;
         const selectedModel = modelSelector.value;
+
+        // ==================== ЛОГИКА ТЕСТОВОГО РЕЖИМА ====================
+        if (selectedProvider === 'test') {
+            if (!setting) {
+                alert('Пожалуйста, введите сеттинг.');
+                return;
+            }
+            testFlowManager.start();
+            return; // Прерываем обычный процесс генерации
+        }
+        // ==================== КОНЕЦ ЛОГИКИ ТЕСТОВОГО РЕЖИМА ====================
+
         const apiKey = localStorage.getItem(`${selectedProvider}_api_key`) || '';
         if (!setting || !selectedModel || (!apiKey && selectedProvider !== 'local' && selectedProvider !== 'vps_proxy')) {
             alert('Пожалуйста, введите сеттинг, выберите модель и убедитесь, что API ключ добавлен.'); return;
@@ -735,16 +761,23 @@ window.addEventListener('pywebviewready', async () => {
         graphBox.innerHTML = '<p>Подключение к серверу...</p>';
         generateBtn.disabled = true;
         window.chats[window.activeChatId].setting = setting;
-        showTab('json'); 
-        const generation_settings = window.chats[window.activeChatId].generation_settings;
+        showTab('json');
+        // generation_settings уже сохраняются в saveGenerationSettings
+        // const generation_settings = window.chats[window.activeChatId].generation_settings;
 
         try {
             const response = await fetch('/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ setting, api_key: apiKey, api_provider: selectedProvider, model: selectedModel }),
+                body: JSON.stringify({
+                    setting,
+                    api_key: apiKey,
+                    api_provider: selectedProvider,
+                    model: selectedModel,
+                    ...window.chats[window.activeChatId].generation_settings // Передаем все настройки
+                }),
             });
-            
+
             if (!response.ok) {
                  const errorData = await response.json();
                  throw new Error(errorData.error || `Ошибка сервера: ${response.status}`);
@@ -757,7 +790,7 @@ window.addEventListener('pywebviewready', async () => {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                
+
                 const chunk = decoder.decode(value, { stream: true });
                 const lines = chunk.split('\n').filter(line => line.trim() !== '');
 
@@ -811,47 +844,258 @@ window.addEventListener('pywebviewready', async () => {
         themeSelect.value = savedTheme; applyTheme(savedTheme);
         themeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
     } else { applyTheme(localStorage.getItem('theme') || 'system'); }
-    
+
     await syncApiKeysFromFileToLocalStorage();
     await loadChats();
     if (window.activeChatId && window.chats[window.activeChatId]) switchChat(window.activeChatId);
     else if (Object.keys(window.chats).length > 0) switchChat(Object.keys(window.chats)[0]);
     else createNewChat();
     renderChatList(); updateModels(); showTab('graph');
-});
 
-// Глобальные обработчики событий pywebview
-window.addEventListener('download-finished', (e) => { if (e.detail.status !== 'cancelled') alert(`Загрузка завершена!\nСтатус: ${e.detail.status}\nСообщение: ${e.detail.message}`); });
-window.prepareForShutdown = async () => { try { if (typeof window.saveChats === "function") await window.saveChats(); } finally { if (window.pywebview && window.pywebview.api) window.pywebview.api.finalize_shutdown(); } };
-function getActiveDownloads() { return JSON.parse(localStorage.getItem('activeDownloads')) || {}; }
-function setActiveDownloads(d) { localStorage.setItem('activeDownloads', JSON.stringify(d)); }
-window.startDownload = (repoId, filename) => { const d = getActiveDownloads(); d[`${repoId}/${filename}`] = { repo_id: repoId, filename, p: 0 }; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-started', { detail: d[`${repoId}/${filename}`] })); };
-window.updateDownloadProgress = (p) => { const d=getActiveDownloads(); d[`${p.repo_id}/${p.filename}`]=p; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-progress', { detail: p })); };
-window.finishDownload = (f) => { const d=getActiveDownloads(); delete d[`${f.repo_id}/${f.filename}`]; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-finished', { detail: f })); };
-const addNarrativeBtn = document.getElementById('add-narrative-btn');
-if (addNarrativeBtn) {
-    addNarrativeBtn.addEventListener('click', () => {
-        const customInput = document.getElementById('custom-narrative-input');
-        const narrativeText = customInput.value.trim();
-        if (!narrativeText) return; // Не добавлять пустые
 
-        const container = document.getElementById('narrative-elements-group');
-        
-        // Создаем новый чекбокс
-        const label = document.createElement('label');
-        label.className = 'custom-narrative-element'; // Класс для легкого удаления
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.name = 'narrative_element';
-        checkbox.value = narrativeText;
-        checkbox.checked = true; // Сразу отмечаем его
-        
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(' ' + narrativeText));
-        container.appendChild(label);
-        
-        customInput.value = ''; // Очищаем поле ввода
-        saveGenerationSettings(); // Сразу сохраняем новое состояние
+    // ==================== ЛОГИКА ТЕСТОВОГО РЕЖИМА (ОБЪЕКТ МЕНЕДЖЕРА) ====================
+    const testFlowManager = {
+        state: {}, // Состояние, передаваемое между шагами генерации
+        currentStep: 'idle', // Текущий шаг: 'concept', 'architect', 'director', 'detailing', 'validating', 'correcting', 'done'
+        stepTitles: { // Заголовки для каждого шага
+            concept: "1/5: Концепт сюжета",
+            architect: "2/5: Извлечение сцен",
+            director: "3/5: Построение графа",
+            detailing: "4/5: Детализация сцен",
+            correcting: "5/5: Финальная корректура"
+        },
+
+        async start() {
+            this.currentStep = 'concept'; // Начинаем с первого шага
+            // Сохраняем начальные параметры генерации в состоянии
+            this.state = {
+                setting: document.getElementById('setting-input').value,
+                ...window.chats[window.activeChatId].generation_settings
+            };
+            // Получаем первый промпт и показываем модальное окно
+            await this.fetchAndShowPrompt();
+        },
+
+        async next() {
+            const userResponse = testModeResponseInput.value.trim();
+            if (!userResponse) {
+                testModeStatus.textContent = 'Ответ не может быть пустым.';
+                testModeStatus.className = 'status-message status-error';
+                return;
+            }
+
+            testModeStatus.textContent = '';
+            testModeSubmitBtn.disabled = true;
+            testModeSubmitBtn.textContent = 'Обработка...';
+
+            try {
+                // Обрабатываем ответ пользователя в зависимости от текущего шага
+                switch (this.currentStep) {
+                    case 'concept':
+                        this.state.concept_response = userResponse;
+                        this.currentStep = 'architect';
+                        break;
+                    case 'architect':
+                        this.state.architect_response = userResponse;
+                        this.currentStep = 'director';
+                        break;
+                    case 'director':
+                        // Для директора нужно распарсить JSON и подготовить скелет для детализации
+                        try {
+                            const skeleton = JSON.parse(userResponse);
+                            if (!skeleton.scenes || !skeleton.start_scene) {
+                                throw new Error("Неверная структура JSON. Должны быть 'scenes' и 'start_scene'.");
+                            }
+                            // --- НОРМАЛИЗАЦИЯ: Преобразуем 'scenes' из объекта в массив, если это необходимо ---
+                            if (typeof skeleton.scenes === 'object' && !Array.isArray(skeleton.scenes)) {
+                                console.warn("Director returned 'scenes' as an object, converting to array.");
+                                const sceneArray = [];
+                                for (const key in skeleton.scenes) {
+                                    if (Object.hasOwnProperty.call(skeleton.scenes, key)) {
+                                        const scene = skeleton.scenes[key];
+                                        if (!scene.scene_id) { // Убедимся, что scene_id есть в каждом объекте сцены
+                                            scene.scene_id = key;
+                                        }
+                                        sceneArray.push(scene);
+                                    }
+                                }
+                                skeleton.scenes = sceneArray;
+                            }
+                            // --- КОНЕЦ НОРМАЛИЗАЦИИ ---
+                            this.state.skeleton_json = skeleton;
+                            this.state.scene_index_to_detail = 0; // Инициализируем индекс для детализации сцен
+                            this.currentStep = 'detailing';
+                        } catch (e) {
+                            throw new Error(`Неверный JSON ответ для Режиссера: ${e.message}`);
+                        }
+                        break;
+                    case 'detailing':
+                        // Обрабатываем детализацию одной сцены
+                        try {
+                            const detailedJson = JSON.parse(userResponse);
+                            const sceneIndex = this.state.scene_index_to_detail;
+                            const sceneToUpdate = this.state.skeleton_json.scenes[sceneIndex];
+
+                            // Обновляем текст сцены
+                            sceneToUpdate.text = detailedJson.text || "Описание не было сгенерировано.";
+
+                            // Обновляем тексты выборов
+                            const detailedChoicesText = detailedJson.choices_text || [];
+                            sceneToUpdate.choices.forEach((choice, choice_idx) => {
+                                choice.text = detailedChoicesText[choice_idx] || choice.choice_summary || "...";
+                                delete choice.choice_summary; // Удаляем временное поле
+                            });
+                            delete sceneToUpdate.summary; // Удаляем временное поле
+
+                            this.state.scene_index_to_detail++; // Переходим к следующей сцене
+                            if (this.state.scene_index_to_detail >= this.state.skeleton_json.scenes.length) {
+                                // Все сцены детализированы, переходим к валидации
+                                this.currentStep = 'validating';
+                            }
+                        } catch (e) {
+                            throw new Error(`Неверный JSON ответ для Сценариста (детализация): ${e.message}`);
+                        }
+                        break;
+                    case 'validating': // Это внутренний шаг, он обрабатывает себя сам
+                        // Валидация происходит на сервере, здесь просто переходим к корректуре
+                        this.state.final_quest = this.state.skeleton_json; // Результат детализации - это то, что валидируем
+                        this.currentStep = 'correcting';
+                        break;
+                    case 'correcting':
+                        // Финальный исправленный JSON
+                        try {
+                            this.state.final_quest = JSON.parse(userResponse);
+                            this.currentStep = 'done';
+                        } catch (e) {
+                            throw new Error(`Неверный JSON ответ для Корректора: ${e.message}`);
+                        }
+                        break;
+                }
+
+                // Если это последний шаг, завершаем процесс
+                if (this.currentStep === 'done') {
+                    this.finish();
+                } else {
+                    // Иначе, получаем следующий промпт
+                    await this.fetchAndShowPrompt();
+                }
+            } catch(e) {
+                testModeStatus.textContent = `Ошибка: ${e.message}`;
+                testModeStatus.className = 'status-message status-error';
+            } finally {
+                testModeSubmitBtn.disabled = false;
+                testModeSubmitBtn.textContent = 'Продолжить';
+            }
+        },
+
+        async fetchAndShowPrompt() {
+            // Получаем промпт с сервера для текущего шага
+            const response = await fetch('/test/get_prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: this.currentStep, state: this.state })
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || `Ошибка сервера: ${response.status}`);
+            }
+            const data = await response.json();
+
+            // Обновляем UI модального окна
+            let title = this.stepTitles[this.currentStep] || 'Тестовый режим';
+            if (this.currentStep === 'detailing' && this.state.skeleton_json && this.state.skeleton_json.scenes) {
+                const sceneNum = this.state.scene_index_to_detail + 1;
+                const totalScenes = this.state.skeleton_json.scenes.length;
+                title += ` (сцена ${sceneNum}/${totalScenes})`;
+            }
+
+            testModeStepIndicator.textContent = title;
+            testModePromptDisplay.textContent = data.prompt;
+            testModeResponseInput.value = ''; // Очищаем поле для нового ответа
+            testModeModal.style.display = 'flex'; // Показываем модальное окно
+            testModeResponseInput.focus(); // Фокусируем на поле ввода
+        },
+
+        hideModal() {
+            testModeModal.style.display = 'none';
+            this.currentStep = 'idle';
+            this.state = {}; // Сбрасываем состояние
+        },
+
+        finish() {
+            // Процесс завершен, обновляем главный UI
+            // _validate_and_clean_quest - функция из quest_generator.py,
+            // на JS её нет, поэтому тут нужно только передать final_quest
+            // или реализовать её логику здесь, но это выходит за рамки текущей задачи.
+            // Для целей демонстрации просто используем what we got.
+            const resultText = JSON.stringify(this.state.final_quest, null, 2);
+            window.chats[window.activeChatId].result = resultText;
+            document.getElementById('result-box').textContent = resultText;
+            renderQuestGraph(resultText);
+            showTab('graph'); // Показываем граф по завершении
+            debouncedSaveChats(); // Сохраняем чаты
+            this.hideModal(); // Закрываем модальное окно
+        }
+    }; // КОНЕЦ testFlowManager
+
+    // ==================== ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ СОБЫТИЙ PYWEBVIEW ====================
+    window.addEventListener('download-finished', (e) => { if (e.detail.status !== 'cancelled') alert(`Загрузка завершена!\nСтатус: ${e.detail.status}\nСообщение: ${e.detail.message}`); });
+    window.prepareForShutdown = async () => { try { if (typeof window.saveChats === "function") await window.saveChats(); } finally { if (window.pywebview && window.pywebview.api) window.pywebview.api.finalize_shutdown(); } };
+    function getActiveDownloads() { return JSON.parse(localStorage.getItem('activeDownloads')) || {}; }
+    function setActiveDownloads(d) { localStorage.setItem('activeDownloads', JSON.stringify(d)); }
+    window.startDownload = (repoId, filename) => { const d = getActiveDownloads(); d[`${repoId}/${filename}`] = { repo_id: repoId, filename, p: 0 }; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-started', { detail: d[`${repoId}/${filename}`] })); };
+    window.updateDownloadProgress = (p) => { const d=getActiveDownloads(); d[`${p.repo_id}/${p.filename}`]=p; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-progress', { detail: p })); };
+    window.finishDownload = (f) => { const d=getActiveDownloads(); delete d[`${f.repo_id}/${f.filename}`]; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-finished', { detail: f })); };
+
+    // Обработчики для кнопок тестового режима
+    testModeSubmitBtn.addEventListener('click', () => testFlowManager.next());
+    testModeCancelBtn.addEventListener('click', () => testFlowManager.hideModal());
+
+    // Новый обработчик для кнопки копирования промпта
+    testModeCopyPromptBtn.addEventListener('click', () => {
+        const promptText = testModePromptDisplay.textContent;
+        navigator.clipboard.writeText(promptText).then(() => {
+            // Опционально: показать временное сообщение "Скопировано!"
+            const originalTitle = testModeCopyPromptBtn.title;
+            const originalFill = testModeCopyPromptBtn.querySelector('svg').getAttribute('fill');
+            testModeCopyPromptBtn.title = 'Скопировано!';
+            testModeCopyPromptBtn.querySelector('svg').setAttribute('fill', 'var(--accent-primary)'); // Немного визуального фидбека
+            setTimeout(() => {
+                testModeCopyPromptBtn.title = originalTitle;
+                testModeCopyPromptBtn.querySelector('svg').setAttribute('fill', originalFill);
+            }, 1500);
+        }).catch(err => {
+            console.error('Не удалось скопировать промпт:', err);
+            alert('Ошибка при копировании промпта.');
+        });
     });
-}
+
+    // Обработчик для кнопки добавления кастомных нарративных элементов
+    const addNarrativeBtn = document.getElementById('add-narrative-btn');
+    if (addNarrativeBtn) {
+        addNarrativeBtn.addEventListener('click', () => {
+            const customInput = document.getElementById('custom-narrative-input');
+            const narrativeText = customInput.value.trim();
+            if (!narrativeText) return; // Не добавлять пустые
+
+            const container = document.getElementById('narrative-elements-group');
+
+            // Создаем новый чекбокс
+            const label = document.createElement('label');
+            label.className = 'custom-narrative-element'; // Класс для легкого удаления
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'narrative_element';
+            checkbox.value = narrativeText;
+            checkbox.checked = true; // Сразу отмечаем его
+
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(' ' + narrativeText));
+            container.appendChild(label);
+
+            customInput.value = ''; // Очищаем поле ввода
+            saveGenerationSettings(); // Сразу сохраняем новое состояние
+        });
+    }
+});
