@@ -22,6 +22,11 @@ window.addEventListener('pywebviewready', async () => {
     const graphBox = document.getElementById('graph-box');
     const jsonTab = document.getElementById('json-tab');
     const graphTab = document.getElementById('graph-tab');
+    const previewTab = document.getElementById('preview-tab');
+    const previewBox = document.getElementById('preview-box');
+    const sceneTextDisplay = document.getElementById('scene-text-display');
+    const sceneChoicesContainer = document.getElementById('scene-choices-container');
+    const restartPreviewBtn = document.getElementById('restart-preview-btn');
     const sidebar = document.querySelector('.sidebar');
     
     const editModeCheckbox = document.getElementById('edit-mode-checkbox');
@@ -34,6 +39,44 @@ window.addEventListener('pywebviewready', async () => {
     window.activeChatId = null;
     let saveTimeout = null;
     let chatsVisible = false;
+
+    // ==================== ЛОГИКА ПРЕДПРОСМОТРА ====================
+
+    function renderScenePreview(sceneId) {
+        const questData = getCurrentQuestData();
+        if (!questData || !questData.scenes) {
+            sceneTextDisplay.textContent = "Ошибка: не удалось загрузить данные квеста для предпросмотра.";
+            sceneChoicesContainer.innerHTML = '';
+            return;
+        }
+
+        const scene = questData.scenes.find(s => s.scene_id === sceneId);
+        if (!scene) {
+            sceneTextDisplay.textContent = `Игра окончена. (Сцена с ID "${sceneId}" не найдена).`;
+            sceneChoicesContainer.innerHTML = '';
+            return;
+        }
+
+        sceneTextDisplay.innerHTML = scene.text.replace(/\n/g, '<br>');
+        sceneChoicesContainer.innerHTML = '';
+
+        if (scene.choices && scene.choices.length > 0) {
+            scene.choices.forEach(choice => {
+                const button = document.createElement('button');
+                button.textContent = choice.text;
+                button.classList.add('choice-btn');
+                button.addEventListener('click', () => renderScenePreview(choice.next_scene));
+                sceneChoicesContainer.appendChild(button);
+            });
+        } else {
+            sceneChoicesContainer.innerHTML = '<p>Конец ветки сюжета.</p>';
+        }
+    }
+
+    function startPreview() {
+        const questData = getCurrentQuestData();
+        if (questData && questData.start_scene) renderScenePreview(questData.start_scene);
+    }
 
     // ==================== КЛЮЧЕВЫЕ ФУНКЦИИ (ЗАГРУЗКА/СОХРАНЕНИЕ) ====================
 
@@ -542,22 +585,34 @@ window.addEventListener('pywebviewready', async () => {
     settingInput.addEventListener('blur', () => { clearTimeout(saveTimeout); saveChats(); });
     providerRadios.forEach(radio => radio.addEventListener('change', updateModels));
     editModeCheckbox.addEventListener('change', () => { isEditMode = editModeCheckbox.checked; graphBox.style.cursor = isEditMode ? 'context-menu' : 'default'; renderQuestGraph(window.chats[window.activeChatId].result); });
+    restartPreviewBtn.addEventListener('click', startPreview);
 
     function showTab(tabName) {
         hideContextMenu();
         if (tabName === 'graph') {
             graphTab.classList.add('active'); jsonTab.classList.remove('active');
+            previewTab.classList.remove('active');
             graphBox.style.display = 'block'; resultBoxWrapper.style.display = 'none';
+            previewBox.style.display = 'none';
             const currentResult = window.activeChatId && window.chats[window.activeChatId]?.result;
             if (currentResult && !currentResult.includes('Здесь появится')) renderQuestGraph(currentResult);
-        } else {
+        } else if (tabName === 'json') {
             jsonTab.classList.add('active'); graphTab.classList.remove('active');
-            graphBox.style.display = 'none'; resultBoxWrapper.style.display = 'block';
+            previewTab.classList.remove('active');
+            graphBox.style.display = 'none'; previewBox.style.display = 'none';
+            resultBoxWrapper.style.display = 'block';
+        } else if (tabName === 'preview') {
+            previewTab.classList.add('active'); graphTab.classList.remove('active');
+            jsonTab.classList.remove('active');
+            graphBox.style.display = 'none'; resultBoxWrapper.style.display = 'none';
+            previewBox.style.display = 'block';
+            startPreview();
         }
     }
 
     graphTab.addEventListener('click', () => showTab('graph'));
     jsonTab.addEventListener('click', () => showTab('json'));
+    previewTab.addEventListener('click', () => showTab('preview'));
 
         copyResultBtn.addEventListener('click', () => {
         if (!window.activeChatId) return;

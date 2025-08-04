@@ -82,6 +82,7 @@
                             <div class="result-tabs">
                                 <button class="tab-link active" id="graph-tab">Граф</button>
                                 <button class="tab-link" id="json-tab">JSON</button>
+                                <button class="tab-link" id="preview-tab">▶️ Предпросмотр</button>
                             </div>
                             <div class="edit-mode-toggle">
                                 <label for="edit-mode-checkbox" class="toggle-label">
@@ -106,6 +107,13 @@
                         </div>
                         <div id="result-box-wrapper" style="display: none;">
                             <pre id="result-box">Здесь появится сгенерированный JSON...</pre>
+                        </div>
+                        <div id="preview-box" style="display: none;">
+                            <div class="preview-controls">
+                                <button id="restart-preview-btn">Начать заново</button>
+                            </div>
+                            <div id="scene-text-display"></div>
+                            <div id="scene-choices-container"></div>
                         </div>
                     </div>
                 </div>

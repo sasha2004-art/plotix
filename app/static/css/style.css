@@ -694,3 +694,43 @@ pre {
 .context-menu .hidden {
     display: none;
 }
+
+/* --- Стили для режима предпросмотра --- */
+#preview-box {
+    padding: 20px;
+    background-color: var(--bg-sidebar);
+    border-radius: 0 0 4px 4px;
+    overflow-y: auto;
+    max-height: 540px;
+}
+
+.preview-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--bg-task-card-footer);
+}
+
+.preview-controls button {
+    width: auto;
+    padding: 8px 16px;
+    font-size: 14px;
+}
+
+#scene-text-display {
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text-primary);
+    margin-bottom: 25px;
+}
+
+#scene-choices-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.choice-btn {
+    width: 100%; /* Кнопки на всю ширину */
+}
