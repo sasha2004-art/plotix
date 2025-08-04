@@ -55,6 +55,58 @@
                         <textarea id="setting-input" rows="10" placeholder="Например: Игрок - детектив в нуарном городе, расследующий загадочное исчезновение певицы из джаз-клуба..."></textarea>
                     </div>
 
+                    <!-- Начало: Панель Режиссера -->
+                    <div class="form-group">
+                        <label>Параметры генерации (Панель Режиссера):</label>
+                        <div style="border: 1px solid var(--bg-task-card-footer); border-radius: 4px; padding: 15px;">
+                            <div class="form-row" style="align-items: flex-start;">
+                                <!-- Количество сцен -->
+                                <div class="form-group" style="flex-grow: 1;">
+                                    <label for="scene-count-input">Количество сцен (5-20):</label>
+                                    <input type="number" id="scene-count-input" value="8" min="5" max="20" style="width: 100%; padding: 10px; background-color: var(--bg-sidebar); border: 1px solid var(--bg-task-card-footer); border-radius: 4px; color: var(--text-primary); font-size: 16px; box-sizing: border-box;">
+                                </div>
+                                <!-- Темп повествования (обновлено) -->
+                                <div class="form-group" style="flex-grow: 2;">
+                                    <label for="pacing-input">Темп повествования:</label>
+                                    <input list="pacings" id="pacing-input" placeholder="Выберите или введите свой..." style="width: 100%; padding: 10px; background-color: var(--bg-sidebar); border: 1px solid var(--bg-task-card-footer); border-radius: 4px; color: var(--text-primary); font-size: 16px; box-sizing: border-box;">
+                                    <datalist id="pacings">
+                                        <option value="Медленный, вдумчивый"></option>
+                                        <option value="Динамичный, напряженный"></option>
+                                        <option value="Рваный, с резкими сменами темпа"></option>
+                                        <option value="Равномерный, спокойный"></option>
+                                    </datalist>
+                                </div>
+                            </div>
+                            <!-- Тон -->
+                            <div class="form-group">
+                                <label for="tone-input">Тон:</label>
+                                <input list="tones" id="tone-input" placeholder="Выберите из списка или введите свой..." style="width: 100%; padding: 10px; background-color: var(--bg-sidebar); border: 1px solid var(--bg-task-card-footer); border-radius: 4px; color: var(--text-primary); font-size: 16px; box-sizing: border-box;">
+                                <datalist id="tones">
+                                    <option value="Драматический"></option>
+                                    <option value="Комедийный"></option>
+                                    <option value="Трагический"></option>
+                                    <option value="Героический"></option>
+                                    <option value="Нуарный"></option>
+                                </datalist>
+                            </div>
+                            <!-- Нарративные элементы (обновлено) -->
+                            <div class="form-group">
+                                <label>Нарративные элементы:</label>
+                                <div id="narrative-elements-group" class="provider-selector" style="flex-wrap: wrap; justify-content: flex-start; padding: 10px; gap: 15px;">
+                                    <label><input type="checkbox" name="narrative_element" value="moral_dilemma"> Моральная дилемма</label>
+                                    <label><input type="checkbox" name="narrative_element" value="unreliable_npc"> Ненадежный NPC</label>
+                                    <label><input type="checkbox" name="narrative_element" value="false_trail"> Ложный след</label>
+                                    <label><input type="checkbox" name="narrative_element" value="multiple_endings"> Несколько концовок</label>
+                                </div>
+                                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                    <input type="text" id="custom-narrative-input" placeholder="Напишите свой элемент и нажмите..." style="flex-grow: 1; padding: 10px; background-color: var(--bg-sidebar); border: 1px solid var(--bg-task-card-footer); border-radius: 4px; color: var(--text-primary); font-size: 16px;">
+                                    <button id="add-narrative-btn" style="width: auto; padding: 0 15px;">Добавить</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Конец: Панель Режиссера -->
+
                     <div class="form-row">
                         <div class="form-group provider-group">
                             <label>Выберите API провайдера:</label>

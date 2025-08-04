@@ -461,18 +461,71 @@ window.addEventListener('pywebviewready', async () => {
         const chat = window.chats[chatId];
         settingInput.value = chat.setting;
         resultBox.textContent = chat.result;
+
+        const settings = chat.generation_settings || { scene_count: 8, tone: '', pacing: '', narrative_elements: [] };
+        
+        document.getElementById('scene-count-input').value = settings.scene_count;
+        document.getElementById('tone-input').value = settings.tone;
+        document.getElementById('pacing-input').value = settings.pacing;
+
+        // --- НАЧАЛО ИСПРАВЛЕНИЯ ЛОГИКИ ---
+
+        // 1. Удаляем все старые кастомные чекбоксы, чтобы избежать дублирования.
+        document.querySelectorAll('.custom-narrative-element').forEach(el => el.remove());
+        
+        // 2. Создаем КОНСТАНТНЫЙ список стандартных элементов. Это ключ к исправлению.
+        const PREDEFINED_ELEMENTS = new Set(['moral_dilemma', 'unreliable_npc', 'false_trail', 'multiple_endings']);
+        const narrativeContainer = document.getElementById('narrative-elements-group');
+        const allElementsToDisplay = settings.narrative_elements || [];
+
+        // 3. Обновляем состояние ВСЕХ стандартных чекбоксов.
+        document.querySelectorAll('input[name="narrative_element"]').forEach(checkbox => {
+            checkbox.checked = allElementsToDisplay.includes(checkbox.value);
+        });
+        
+        // 4. Проходим по сохраненным элементам и создаем чекбоксы для тех, которых нет в стандартном списке.
+        allElementsToDisplay.forEach(elementValue => {
+            if (!PREDEFINED_ELEMENTS.has(elementValue)) {
+                // Этот элемент - кастомный, создаем его.
+                const label = document.createElement('label');
+                label.className = 'custom-narrative-element';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'narrative_element';
+                checkbox.value = elementValue;
+                checkbox.checked = true; // Он сохранен, значит должен быть отмечен.
+                
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(' ' + elementValue));
+                narrativeContainer.appendChild(label);
+            }
+        });
+        // --- КОНЕЦ ИСПРАВЛЕНИЯ ЛОГИКИ ---
+
         renderQuestGraph(chat.result); 
         renderChatList();
-        saveChats();
+        saveChats(); // saveChats здесь не обязателен, но не повредит
     }
 
     function createNewChat() {
-        const newChatId = `chat_${Date.now()}`;
-        const initialResult = JSON.stringify({ start_scene: "scene_1", scenes: [{ scene_id: "scene_1", text: "Это стартовая сцена. Включите 'Режим правки' и кликните правой кнопкой мыши, чтобы начать.", choices: [] }] }, null, 2);
-        window.chats[newChatId] = { id: newChatId, title: `Новый чат ${Object.keys(window.chats).length + 1}`, setting: '', result: initialResult };
-        renderChatList();
-        switchChat(newChatId);
-    }
+    const newChatId = `chat_${Date.now()}`;
+    const initialResult = JSON.stringify({ start_scene: "scene_1", scenes: [{ scene_id: "scene_1", text: "Это стартовая сцена. Включите 'Режим правки' и кликните правой кнопкой мыши, чтобы начать.", choices: [] }] }, null, 2);
+    window.chats[newChatId] = { 
+        id: newChatId, 
+        title: `Новый чат ${Object.keys(window.chats).length + 1}`, 
+        setting: '', 
+        result: initialResult,
+        generation_settings: {
+            scene_count: 8,
+            tone: '',
+            pacing: '',
+            narrative_elements: []
+        }
+    };
+    renderChatList();
+    switchChat(newChatId);
+}
 
     async function updateModels() {
         const selectedProvider = document.querySelector('input[name="api_provider"]:checked').value;
@@ -573,6 +626,7 @@ window.addEventListener('pywebviewready', async () => {
         }
         hideContextMenu();
     });
+    
 
     if (sidebar) {
         sidebar.addEventListener('mouseenter', () => sidebar.classList.remove('collapsed'));
@@ -586,7 +640,44 @@ window.addEventListener('pywebviewready', async () => {
     providerRadios.forEach(radio => radio.addEventListener('change', updateModels));
     editModeCheckbox.addEventListener('change', () => { isEditMode = editModeCheckbox.checked; graphBox.style.cursor = isEditMode ? 'context-menu' : 'default'; renderQuestGraph(window.chats[window.activeChatId].result); });
     restartPreviewBtn.addEventListener('click', startPreview);
+    // --- НАЧАЛО ИСПРАВЛЕННОГО БЛОКА ---
+    function saveGenerationSettings() {
+        if (!window.activeChatId || !window.chats[window.activeChatId]) return;
+        
+        const sceneCountInput = document.getElementById('scene-count-input');
+        const toneInput = document.getElementById('tone-input');
+        const pacingInput = document.getElementById('pacing-input');
 
+        const settings = {
+            scene_count: sceneCountInput ? sceneCountInput.value : 8,
+            tone: toneInput ? toneInput.value.trim() : '',
+            pacing: pacingInput ? pacingInput.value.trim() : '',
+            narrative_elements: Array.from(document.querySelectorAll('input[name="narrative_element"]:checked')).map(cb => cb.value)
+        };
+        
+        window.chats[window.activeChatId].generation_settings = settings;
+        debouncedSaveChats();
+    }
+
+    // Добавляем прослушиватели событий с проверкой на существование элемента
+    const sceneCountInput = document.getElementById('scene-count-input');
+    if (sceneCountInput) sceneCountInput.addEventListener('input', saveGenerationSettings);
+
+    const toneInput = document.getElementById('tone-input');
+    if (toneInput) toneInput.addEventListener('input', saveGenerationSettings);
+
+    const pacingInput = document.getElementById('pacing-input');
+    if (pacingInput) pacingInput.addEventListener('input', saveGenerationSettings);
+
+    const narrativeGroup = document.getElementById('narrative-elements-group');
+    if (narrativeGroup) narrativeGroup.addEventListener('change', saveGenerationSettings);
+    // --- КОНЕЦ ИСПРАВЛЕННОГО БЛОКА ---
+
+    document.getElementById('scene-count-input').addEventListener('input', saveGenerationSettings);
+    document.getElementById('tone-input').addEventListener('input', saveGenerationSettings);
+    document.getElementById('pacing-input').addEventListener('input', saveGenerationSettings);
+    document.getElementById('narrative-elements-group').addEventListener('change', saveGenerationSettings);
+    
     function showTab(tabName) {
         hideContextMenu();
         if (tabName === 'graph') {
@@ -645,6 +736,7 @@ window.addEventListener('pywebviewready', async () => {
         generateBtn.disabled = true;
         window.chats[window.activeChatId].setting = setting;
         showTab('json'); 
+        const generation_settings = window.chats[window.activeChatId].generation_settings;
 
         try {
             const response = await fetch('/generate', {
@@ -736,3 +828,30 @@ function setActiveDownloads(d) { localStorage.setItem('activeDownloads', JSON.st
 window.startDownload = (repoId, filename) => { const d = getActiveDownloads(); d[`${repoId}/${filename}`] = { repo_id: repoId, filename, p: 0 }; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-started', { detail: d[`${repoId}/${filename}`] })); };
 window.updateDownloadProgress = (p) => { const d=getActiveDownloads(); d[`${p.repo_id}/${p.filename}`]=p; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-progress', { detail: p })); };
 window.finishDownload = (f) => { const d=getActiveDownloads(); delete d[`${f.repo_id}/${f.filename}`]; setActiveDownloads(d); window.dispatchEvent(new CustomEvent('download-finished', { detail: f })); };
+const addNarrativeBtn = document.getElementById('add-narrative-btn');
+if (addNarrativeBtn) {
+    addNarrativeBtn.addEventListener('click', () => {
+        const customInput = document.getElementById('custom-narrative-input');
+        const narrativeText = customInput.value.trim();
+        if (!narrativeText) return; // Не добавлять пустые
+
+        const container = document.getElementById('narrative-elements-group');
+        
+        // Создаем новый чекбокс
+        const label = document.createElement('label');
+        label.className = 'custom-narrative-element'; // Класс для легкого удаления
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'narrative_element';
+        checkbox.value = narrativeText;
+        checkbox.checked = true; // Сразу отмечаем его
+        
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(' ' + narrativeText));
+        container.appendChild(label);
+        
+        customInput.value = ''; // Очищаем поле ввода
+        saveGenerationSettings(); // Сразу сохраняем новое состояние
+    });
+}

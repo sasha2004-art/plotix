@@ -61,13 +61,20 @@ def generate_quest_endpoint():
     api_key = data["api_key"]
     api_provider = data["api_provider"]
     model = data["model"]
+    scene_count = data.get("scene_count", 8)
+    tone = data.get("tone", "")
+    pacing = data.get("pacing", "")
+    narrative_elements = data.get("narrative_elements", [])
 
     def generate_stream():
         """Оборачивает генератор квестов для потоковой передачи."""
-        quest_generator = create_quest_from_setting(setting, api_key, api_provider, model)
+        quest_generator = create_quest_from_setting(
+            setting, api_key, api_provider, model,
+            scene_count, tone, pacing, narrative_elements
+        )
         for progress_update in quest_generator:
-            # Отправляем каждую JSON-строку с символом новой строки
             yield progress_update + '\n'
+
 
     # Используем mimetype 'application/x-ndjson' для потоковой передачи JSON, разделенного новой строкой
     return Response(stream_with_context(generate_stream()), mimetype='application/x-ndjson')
