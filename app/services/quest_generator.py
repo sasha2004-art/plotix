@@ -2,13 +2,14 @@ import json
 import logging
 import os
 import re
+import time # <--- ДОБАВЛЕНО
 import requests
 from pathlib import Path
 from typing import Any, Dict, List, Iterator, Set
 
 import google.generativeai as genai
 import openai
-from groq import Groq
+from groq import Groq, APIStatusError # <--- ИЗМЕНЕНО
 
 try:
     from llama_cpp import Llama  # type: ignore[reportMissingImports]
@@ -142,41 +143,69 @@ def _get_correction_prompt(quest_json_str: str) -> str:
 
 
 def _call_llm(prompt: str, api_provider: str, api_key: str, model: str, force_text_response: bool = False) -> str:
-    # ... (без изменений)
-    response_content = None
-    response_format_option = {"type": "text"} if force_text_response else {"type": "json_object"}
-    if api_provider == "groq":
-        client = Groq(api_key=api_key)
-        chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=model, temperature=0.7, response_format=response_format_option)
-        response_content = chat_completion.choices[0].message.content
-    elif api_provider == "openai":
-        client = openai.OpenAI(api_key=api_key)
-        chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=model, temperature=0.7, response_format=response_format_option)
-        response_content = chat_completion.choices[0].message.content
-    elif api_provider == "gemini":
-        genai.configure(api_key=api_key)
-        gemini_model = genai.GenerativeModel(model)
-        response = gemini_model.generate_content(prompt)
-        response_content = response.text
-    elif api_provider == "local":
-        if Llama is None: raise ImportError("Модуль llama_cpp не установлен.")
-        model_dir, model_path = os.getenv("LOCAL_MODEL_PATH", "quest-generator/models"), os.path.join(model_dir, model)
-        if not os.path.exists(model_path): raise FileNotFoundError(f"Локальная модель не найдена по пути: {model_path}")
-        llm = Llama(model_path=model_path, n_ctx=4096, n_gpu_layers=-1, verbose=False, chat_format="chatml")
-        chat_completion = llm.create_chat_completion(messages=[{"role": "user", "content": prompt}], temperature=0.7, response_format=response_format_option, stream=False)
-        response_content = chat_completion["choices"][0]["message"]["content"]
-    elif api_provider == "vps_proxy":
-        proxy_url = "http://91.184.253.216:5001/proxy/generate"
-        payload = {"prompt": prompt, "model": model}
-        logger.info(f"Отправка запроса на VPS прокси: {proxy_url}")
-        response = requests.post(proxy_url, json=payload, timeout=120)
-        response.raise_for_status()
-        response_content = response.text
-    else:
-        raise ValueError(f"Unknown API provider: {api_provider}")
-    if response_content is None: raise ValueError("LLM returned no content.")
-    json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response_content)
-    return json_match.group(1) if json_match else response_content
+    max_retries = 3
+    delay = 1.0  # начальная задержка в секундах
+
+    for attempt in range(max_retries):
+        try:
+            response_content = None
+            response_format_option = {"type": "text"} if force_text_response else {"type": "json_object"}
+            if api_provider == "groq":
+                client = Groq(api_key=api_key)
+                chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=model, temperature=0.7, response_format=response_format_option)
+                response_content = chat_completion.choices[0].message.content
+            elif api_provider == "openai":
+                client = openai.OpenAI(api_key=api_key)
+                chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=model, temperature=0.7, response_format=response_format_option)
+                response_content = chat_completion.choices[0].message.content
+            elif api_provider == "gemini":
+                genai.configure(api_key=api_key)
+                gemini_model = genai.GenerativeModel(model)
+                response = gemini_model.generate_content(prompt)
+                response_content = response.text
+            elif api_provider == "local":
+                if Llama is None: raise ImportError("Модуль llama_cpp не установлен.")
+                model_dir, model_path = os.getenv("LOCAL_MODEL_PATH", "quest-generator/models"), os.path.join(model_dir, model)
+                if not os.path.exists(model_path): raise FileNotFoundError(f"Локальная модель не найдена по пути: {model_path}")
+                llm = Llama(model_path=model_path, n_ctx=4096, n_gpu_layers=-1, verbose=False, chat_format="chatml")
+                chat_completion = llm.create_chat_completion(messages=[{"role": "user", "content": prompt}], temperature=0.7, response_format=response_format_option, stream=False)
+                response_content = chat_completion["choices"][0]["message"]["content"]
+            elif api_provider == "vps_proxy":
+                proxy_url = "http://91.184.253.216:5001/proxy/generate"
+                payload = {"prompt": prompt, "model": model}
+                logger.info(f"Отправка запроса на VPS прокси: {proxy_url}")
+                response = requests.post(proxy_url, json=payload, timeout=120)
+                response.raise_for_status()
+                response_content = response.text
+            else:
+                raise ValueError(f"Unknown API provider: {api_provider}")
+
+            if response_content is None: raise ValueError("LLM returned no content.")
+            json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response_content)
+            return json_match.group(1) if json_match else response_content
+
+        except (APIStatusError, openai.APIStatusError, requests.exceptions.HTTPError) as e:
+            status_code = -1
+            if hasattr(e, 'status_code'):
+                status_code = e.status_code
+            elif hasattr(e, 'response') and hasattr(e.response, 'status_code'):
+                status_code = e.response.status_code
+
+            is_retryable = status_code == 429 or status_code >= 500
+
+            if is_retryable and attempt < max_retries - 1:
+                logger.warning(
+                    f"API вернуло ошибку {status_code}. Повторная попытка через {delay:.1f} сек... (Попытка {attempt + 1}/{max_retries})"
+                )
+                time.sleep(delay)
+                delay *= 2  # Экспоненциальная задержка
+                continue
+            else:
+                logger.error(f"Не удалось выполнить запрос к API после {attempt + 1} попыток или ошибка не является временной.")
+                raise e  # Перевыбрасываем исключение, если все попытки исчерпаны
+        except Exception as e:
+             logger.error(f"Произошла непредвиденная ошибка при вызове LLM: {e}")
+             raise e
 
 
 # ЭТАП 5: "ЦЕНЗОР" (ФИНАЛЬНАЯ ВАЛИДАЦИЯ)
@@ -215,11 +244,13 @@ def create_quest_from_setting(
         yield json.dumps({"status": "concept", "message": "1/6: Геймдизайнер придумывает концепт..."})
         concept_prompt = _get_plot_concept_prompt(setting_text)
         plot_concept = _call_llm(concept_prompt, api_provider, api_key, model, force_text_response=True)
+        time.sleep(1) # Пауза между запросами
 
         # Этап 2: Архитектор
         yield json.dumps({"status": "architect", "message": "2/6: Архитектор извлекает ключевые сцены..."})
         scene_list_prompt = _get_scene_list_from_concept_prompt(plot_concept)
         scene_list_text = _call_llm(scene_list_prompt, api_provider, api_key, model, force_text_response=True)
+        time.sleep(1) # Пауза между запросами
         
         # ЭТАП 2.5: Python-парсер
         scenes_for_graph = []
@@ -237,6 +268,7 @@ def create_quest_from_setting(
         yield json.dumps({"status": "director", "message": "3/6: Режиссёр выстраивает связи и выборы..."})
         graph_prompt = _get_graph_from_scenes_prompt(scene_list_json)
         skeleton_str = _call_llm(graph_prompt, api_provider, api_key, model, force_text_response=False)
+        time.sleep(1) # Пауза между запросами
         skeleton_json = json.loads(skeleton_str)
         if "scenes" not in skeleton_json or "start_scene" not in skeleton_json:
             raise ValueError("Режиссёр не смог создать корректную структуру из списка сцен.")
@@ -260,6 +292,7 @@ def create_quest_from_setting(
                 history_choice = f"Вы решили: '{choice_summary}'. Это привело вас к следующей ситуации: '{summary}'."
             detail_prompt = _get_scene_detail_prompt(setting_text, summary, history_choice, previous_scene_text)
             detailed_str = _call_llm(detail_prompt, api_provider, api_key, model, force_text_response=False)
+            if i < len(final_quest["scenes"]) -1: time.sleep(1) # Пауза между запросами
             detailed_json = json.loads(detailed_str)
             scene_to_detail["text"] = detailed_json.get("text", "Описание не было сгенерировано.")
             scene_map[scene_id]["text"] = scene_to_detail["text"]
@@ -286,7 +319,7 @@ def create_quest_from_setting(
         logger.error(f"Ошибка в многоэтапной генерации: {e}", exc_info=True)
         # ... (обработка ошибок)
         error_message_lower = str(e).lower()
-        error_map = { "quota": "Превышен лимит API.", "insufficient_quota": "Превышен лимит API.", "invalid api key": "Неверный API ключ.", "401": "Неверный API ключ."}
+        error_map = { "quota": "Превышен лимит API.", "insufficient_quota": "Превышен лимит API.", "invalid api key": "Неверный API ключ.", "401": "Неверный API ключ.", "429": "Превышен лимит запросов к API. Попробуйте позже."}
         for key, msg in error_map.items():
             if key in error_message_lower:
                 error_payload = {"error": msg}; break
