@@ -17,6 +17,7 @@ window.addEventListener('pywebviewready', async () => {
     const settingsBtn = document.getElementById('settings-btn');
     const downloadResultBtn = document.getElementById('download-result-btn');
     const themeSelect = document.getElementById('theme-select');
+    const copyResultBtn = document.getElementById('copy-result-btn');
     const resultBoxWrapper = document.getElementById('result-box-wrapper');
     const graphBox = document.getElementById('graph-box');
     const jsonTab = document.getElementById('json-tab');
@@ -558,11 +559,20 @@ window.addEventListener('pywebviewready', async () => {
     graphTab.addEventListener('click', () => showTab('graph'));
     jsonTab.addEventListener('click', () => showTab('json'));
 
-    downloadResultBtn.addEventListener('click', async () => {
+        copyResultBtn.addEventListener('click', () => {
         if (!window.activeChatId) return;
         const content = window.chats[window.activeChatId].result;
-        try { JSON.parse(content); await api.save_quest_to_file(content); }
-        catch (e) { alert('Невозможно скачать, так как результат не является валидным JSON.'); }
+        try {
+            JSON.parse(content);
+            navigator.clipboard.writeText(content).then(() => {
+                alert('JSON скопирован в буфер обмена!');
+            }, (err) => {
+                alert('Ошибка при копировании в буфер обмена.');
+                console.error('Could not copy text: ', err);
+            });
+        } catch (e) {
+            alert('Невозможно скопировать, так как результат не является валидным JSON.');
+        }
     });
 
     generateBtn.addEventListener('click', async () => {
